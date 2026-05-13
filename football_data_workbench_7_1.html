@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Football Data Workbench — Understat + FotMob + FBref</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #181b22;
+    --surface-2: #20242d;
+    --border: #2a2f3a;
+    --text: #e7ecf3;
+    --text-dim: #9aa3b2;
+    --accent: #4f8cff;
+    --accent-dim: #2d5fbf;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --understat: #ff4757;
+    --fotmob: #00b14f;
+    --fbref: #e8a020;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #1a1f2c 0%, #0f1115 100%);
+  }
+  header h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 600; }
+  header .sub { color: var(--text-dim); font-size: 13px; }
+  main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 1100px) { .row { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+  .source-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .source-card.understat { border-left: 4px solid var(--understat); }
+  .source-card.fotmob { border-left: 4px solid var(--fotmob); }
+  .source-card.fbref { border-left: 4px solid var(--fbref); }
+  .source-card h2 { margin: 0 0 4px 0; font-size: 16px; }
+  .source-card .desc { color: var(--text-dim); font-size: 12px; margin-bottom: 16px; line-height: 1.4; }
+  .source-card .meta { font-size: 11px; color: var(--text-dim); margin-bottom: 12px; font-family: ui-monospace, "SF Mono", monospace; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-dim); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.ghost:hover { background: var(--surface-2); }
+  button.understat { background: var(--understat); }
+  button.understat:hover { background: #c0392b; }
+  button.fotmob { background: var(--fotmob); }
+  button.fotmob:hover { background: #008f3e; }
+  button.fbref { background: var(--fbref); }
+  button.fbref:hover { background: #b87a18; }
+  button.danger { background: var(--danger); }
+  .status {
+    margin-top: 12px;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", monospace;
+    min-height: 24px;
+  }
+  .status.success { color: var(--success); }
+  .status.error { color: var(--danger); }
+  .status.loading { color: var(--warning); }
+
+  .workbench {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .workbench h2 { margin: 0 0 16px 0; font-size: 16px; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .controls label { font-size: 12px; color: var(--text-dim); }
+  select, input[type="text"] {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  select:focus, input:focus { outline: 1px solid var(--accent); }
+
+  .table-wrap {
+    overflow: auto;
+    max-height: 560px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: ui-monospace, "SF Mono", monospace;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  thead th:hover { background: #2a3040; }
+  thead th .sort-indicator { color: var(--text-dim); margin-left: 4px; }
+  tbody td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr:hover { background: #1c2029; }
+  tbody td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .row-count { font-size: 12px; color: var(--text-dim); }
+  .schema-box {
+    background: var(--surface-2);
+    padding: 12px;
+    border-radius: 4px;
+    margin-top: 16px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    max-height: 220px;
+    overflow: auto;
+    color: var(--text-dim);
+  }
+  .schema-box .key { color: #93c5fd; }
+  .schema-box .type { color: var(--success); }
+  details summary { cursor: pointer; color: var(--text-dim); padding: 4px 0; }
+  details summary:hover { color: var(--text); }
+
+  .help {
+    background: var(--surface-2);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .help strong { color: var(--text); }
+  .help code {
+    background: rgba(255,255,255,0.05);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+  }
+  .badge.understat { background: var(--understat); color: white; }
+  .badge.fotmob { background: var(--fotmob); color: white; }
+  .badge.fbref { background: var(--fbref); color: #111; }
+  .progress-bar {
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+    display: none;
+  }
+  .progress-bar.active { display: block; }
+  .progress-bar .fill { height: 100%; background: var(--accent); width: 0; transition: width 0.3s; }
+
+  /* ---------- Player Lookup ---------- */
+  :root {
+    --bar-green: #2ecc71;
+    --bar-orange: #f39c12;
+    --bar-bg: #2a2f3a;
+  }
+  textarea {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: ui-monospace, "SF Mono", monospace;
+  }
+  textarea:focus { outline: 1px solid var(--accent); }
+  .lookup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) { .lookup-grid { grid-template-columns: 1fr; } }
+  .lookup-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .lookup-card h3 { margin: 0 0 8px 0; font-size: 14px; }
+  .lookup-card .step { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+  .lookup-card .step ol { padding-left: 20px; margin: 8px 0; }
+  .lookup-card .step li { margin-bottom: 4px; }
+  .bookmarklet-link {
+    display: inline-block;
+    background: #f7d046;
+    color: #1a1a1a;
+    padding: 8px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    margin: 8px 0;
+    cursor: grab;
+    user-select: none;
+  }
+  .bookmarklet-link:hover { background: #f5c624; }
+  textarea#json-paste {
+    width: 100%;
+    min-height: 100px;
+    margin-top: 8px;
+    font-size: 11px;
+    resize: vertical;
+  }
+  .player-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .player-header .name { font-size: 22px; font-weight: 600; }
+  .player-header .meta { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .player-header img { width: 64px; height: 64px; border-radius: 50%; background: var(--surface-2); }
+  .stat-categories {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .stat-categories { grid-template-columns: 1fr; } }
+  .stat-category h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stat-row {
+    display: grid;
+    grid-template-columns: 1.2fr 70px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .stat-row .stat-name { color: var(--text); }
+  .stat-row .stat-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .stat-row .stat-bar {
+    height: 8px;
+    background: var(--bar-bg);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .stat-row .stat-bar .fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+  .stat-row .fill.good { background: var(--bar-green); }
+  .stat-row .fill.avg { background: var(--bar-orange); }
+  .stat-row .fill.poor { background: var(--danger); }
+  .raw-json {
+    margin-top: 20px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    max-height: 300px;
+    overflow: auto;
+    color: var(--text-dim);
+    white-space: pre;
+  }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--success);
+    color: #06251a;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { background: var(--danger); color: white; }
+
+  /* ---------- Roster + Comparison ---------- */
+  .roster {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 16px;
+  }
+  .roster-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .roster-header h4 { margin: 0; font-size: 13px; color: var(--text-dim); }
+  .roster-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .roster-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .roster-chip img {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2);
+  }
+  .roster-chip .fallback {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .roster-chip input[type="checkbox"] { margin: 0; cursor: pointer; }
+  .roster-chip .chip-body { display: flex; flex-direction: column; cursor: pointer; padding-right: 4px; }
+  .roster-chip .chip-body:hover .chip-name { color: var(--accent); }
+  .roster-chip .chip-name { font-weight: 500; transition: color 0.15s; }
+  .roster-chip .chip-meta { color: var(--text-dim); font-size: 11px; }
+  .roster-chip.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .roster-chip .chip-remove {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    padding: 0 4px; font-size: 14px; line-height: 1;
+  }
+  .roster-chip .chip-remove:hover { color: var(--danger); }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .compare-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .compare-table thead th.player-col { text-align: center; min-width: 140px; }
+  .compare-table tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+  }
+  .compare-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .compare-table tbody td.stat-label { color: var(--text); white-space: nowrap; }
+  .compare-table tbody td.value-cell {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .compare-table tbody td.value-cell .v {
+    display: inline-block;
+    min-width: 50px;
+    font-weight: 500;
+  }
+  .compare-table tbody td.value-cell .micro-bar {
+    display: block;
+    height: 4px;
+    background: var(--bar-bg);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .compare-table tbody td.value-cell .micro-bar .fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+  .compare-table tbody td.value-cell.is-best .v {
+    color: var(--bar-green);
+    font-weight: 700;
+  }
+  .compare-table tbody td.value-cell.is-best .micro-bar .fill { background: var(--bar-green); }
+  .compare-table tbody td.value-cell.is-best { background: rgba(46, 204, 113, 0.08); }
+  .compare-table tbody td.value-cell.empty { color: var(--text-dim); }
+  .compare-table tbody tr.category-row td {
+    background: var(--surface-2);
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 10px 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .player-col-header { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .player-col-header img { width: 36px; height: 36px; border-radius: 50%; background: var(--surface-2); }
+  .player-col-header .pcn { font-size: 12px; font-weight: 600; }
+  .player-col-header .pcm { font-size: 10px; color: var(--text-dim); }
+
+  /* ---------- Understat Live Bookmarklet ---------- */
+  .understat-live-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .understat-live-section h3 { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; }
+  .league-paste-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
+  @media (max-width: 900px) { .league-paste-grid { grid-template-columns: repeat(3, 1fr); } }
+  .league-chip {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 8px;
+    font-size: 11px;
+    text-align: center;
+    cursor: default;
+  }
+  .league-chip.done { border-color: var(--success); color: var(--success); }
+  .league-chip.pending { color: var(--text-dim); }
+  .live-badge {
+    display: inline-block;
+    background: rgba(74,222,128,0.15);
+    color: var(--success);
+    border: 1px solid rgba(74,222,128,0.3);
+    border-radius: 3px;
+    font-size: 10px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  /* ---------- FBref Bookmarklet ---------- */
+  --fbref-player: #e8a020;
+  --fbref-team: #7c6de8;
+  .bookmarklet-link.team {
+    background: #c4b5fd;
+  }
+  .bookmarklet-link.team:hover { background: #a78bfa; }
+
+  /* ---------- Recommender ---------- */
+  --recommender: #22d3ee;
+  .source-card.recommender { border-left: 4px solid var(--recommender); }
+  .rec-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  @media (max-width: 900px) { .rec-controls { grid-template-columns: 1fr; } }
+  .rec-controls label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .rec-results { margin-top: 16px; }
+  .rec-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    transition: border-color 0.15s;
+  }
+  .rec-card:hover { border-color: var(--recommender); }
+  .rec-rank { font-size: 20px; font-weight: 700; color: var(--text-dim); text-align: center; }
+  .rec-rank.gold { color: #fbbf24; }
+  .rec-rank.silver { color: #9ca3af; }
+  .rec-rank.bronze { color: #b45309; }
+  .rec-name { font-weight: 600; font-size: 14px; }
+  .rec-meta { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .rec-score {
+    text-align: right;
+  }
+  .rec-score .score-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--recommender);
+  }
+  .rec-score .score-label { font-size: 11px; color: var(--text-dim); }
+  .rec-bars { margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+  .rec-bar-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .rec-bar-row .rb-label { color: var(--text-dim); min-width: 60px; }
+  .rec-bar-row .rb-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .rec-bar-row .rb-fill { height: 100%; background: var(--recommender); border-radius: 2px; }
+  .rec-bar-row .rb-val { min-width: 28px; text-align: right; color: var(--text); }
+  .team-profile-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .team-profile-card h4 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-dim); }
+  .team-profile-bars { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 16px; }
+  @media (max-width: 900px) { .team-profile-bars { grid-template-columns: 1fr 1fr; } }
+  .gap-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .gap-badge.high { background: rgba(248,113,113,0.2); color: var(--danger); }
+  .gap-badge.med { background: rgba(251,191,36,0.15); color: var(--warning); }
+  .gap-badge.low { background: rgba(74,222,128,0.12); color: var(--success); }
+  button.recommender { background: #0e7490; }
+  button.recommender:hover { background: #0c6578; }
+  .fbref-paste-section { margin-top: 12px; }
+  textarea.fbref-paste {
+    width: 100%;
+    min-height: 80px;
+    margin-top: 8px;
+    font-size: 11px;
+    resize: vertical;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Football Data Workbench</h1>
+  <div class="sub">Understat (xG, xA) + FotMob (clubs, rosters) + FBref (200+ stats) — Top 5 ligues européennes</div>
+</header>
+<main>
+
+  <div class="help">
+    <strong>Comment ça marche :</strong> Cette page charge les données directement depuis GitHub via ton navigateur — il n'y a rien à installer.
+    Clique sur un bouton "Charger" pour récupérer un dataset. Une fois chargé, tu peux le filtrer, trier, et l'exporter en JSON ou CSV.
+    Les données brutes sont aussi accessibles via la console du navigateur dans <code>window.data</code>.
+  </div>
+
+  <div class="row">
+    <!-- UNDERSTAT -->
+    <div class="source-card understat">
+      <h2><span class="badge understat">Understat</span> Stats joueurs avancées</h2>
+      <div class="desc">
+        Top 5 ligues + Russie, 2014/15 → 2025/26. ~37 000 lignes joueur-saison.
+        Colonnes: goals, xG, npg, npxG, assists, xA, shots, key_passes, games, time, xGChain, xGBuildup, cartons, position…
+      </div>
+      <div class="meta">
+        Source: github.com/vibedatascience/understat_players_aggregated
+      </div>
+      <div class="btn-row">
+        <button class="understat" onclick="loadUnderstat('historical')">Charger historique 2014–2024</button>
+        <button class="understat" onclick="loadUnderstat('current')">Charger saison 2025/26</button>
+        <button class="understat" onclick="loadUnderstat('full')">Charger TOUT (2014 → aujourd'hui)</button>
+      </div>
+      <div class="progress-bar" id="prog-understat"><div class="fill"></div></div>
+      <div class="status" id="status-understat">En attente. Le fichier complet pèse ~10 MB et peut mettre 10-30s à charger.</div>
+
+      <!-- UNDERSTAT LIVE BOOKMARKLET -->
+      <div class="understat-live-section">
+        <h3>⚡ Données live — Export direct Understat (saison à jour)</h3>
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px 0;">
+          Understat propose un export natif JSON. <strong>Pour chaque ligue :</strong> va sur la page, clique l'icône ⬇️ dans le tableau joueurs → <strong>JSON</strong>, puis charge le fichier ici.
+        </p>
+
+        <div style="font-size:12px;margin-bottom:8px;">
+          Pages à visiter (une par ligue) :
+          <code>understat.com/league/epl/2025</code> ·
+          <code>understat.com/league/la_liga/2025</code> ·
+          <code>understat.com/league/serie_a/2025</code> ·
+          <code>understat.com/league/bundesliga/2025</code> ·
+          <code>understat.com/league/ligue_1/2025</code>
+        </div>
+
+        <div class="league-paste-grid" id="live-league-chips">
+          <div class="league-chip pending" id="chip-EPL">🏴󠁧󠁢󠁥󠁮󠁧󠁿 EPL</div>
+          <div class="league-chip pending" id="chip-La_liga">🇪🇸 La Liga</div>
+          <div class="league-chip pending" id="chip-Serie_A">🇮🇹 Serie A</div>
+          <div class="league-chip pending" id="chip-Bundesliga">🇩🇪 Bundesliga</div>
+          <div class="league-chip pending" id="chip-Ligue_1">🇫🇷 Ligue 1</div>
+        </div>
+
+        <div class="btn-row" style="margin-top:12px;align-items:center;">
+          <label style="font-size:12px;color:var(--text-dim);margin:0;">Ligue :</label>
+          <select id="live-league-select" style="font-size:12px;padding:4px 8px;">
+            <option value="epl">🏴󠁧󠁢󠁥󠁮󠁧󠁿 EPL</option>
+            <option value="la_liga">🇪🇸 La Liga</option>
+            <option value="serie_a">🇮🇹 Serie A</option>
+            <option value="bundesliga">🇩🇪 Bundesliga</option>
+            <option value="ligue_1">🇫🇷 Ligue 1</option>
+          </select>
+          <label style="font-size:12px;color:var(--text-dim);margin:0;">Saison :</label>
+          <input type="number" id="live-season-input" value="2025" min="2014" max="2030" style="width:70px;font-size:12px;padding:4px 8px;">
+          <button class="understat" onclick="document.getElementById('understat-live-file').click()">⚡ Charger fichier JSON</button>
+          <input type="file" id="understat-live-file" accept=".json" style="display:none" onchange="parseUnderstatLiveFile(this)">
+          <button class="ghost" onclick="resetUnderstatLive()">Réinitialiser</button>
+          <span id="live-count-label" style="font-size:12px;color:var(--text-dim);"></span>
+        </div>
+        <div class="status" id="status-understat-live">En attente — exporte le JSON depuis understat.com et charge-le ici.</div>
+      </div>
+    </div>
+
+    <!-- FOTMOB -->
+    <div class="source-card fotmob">
+      <h2><span class="badge fotmob">FotMob</span> Clubs, équipes, joueurs Top 5</h2>
+      <div class="desc">
+        Tous les clubs du Top 5 (PL, La Liga, Serie A, Bundesliga, Ligue 1), avec tous les joueurs de chaque effectif.
+        Auto-mis à jour à chaque mercato. Format JSON.
+      </div>
+      <div class="meta">
+        Source: github.com/gsapoz/topfive-api
+      </div>
+      <div class="btn-row">
+        <button class="fotmob" onclick="loadFotMob()">Charger Top 5 (clubs + joueurs)</button>
+      </div>
+      <div class="progress-bar" id="prog-fotmob"><div class="fill"></div></div>
+      <div class="status" id="status-fotmob">En attente.</div>
+    </div>
+  </div>
+
+    <!-- FBREF -->
+    <div class="source-card fbref">
+      <h2><span class="badge fbref">FBref</span> Stats complètes Top 5 (200+ cols)</h2>
+      <div class="desc">
+        Données FBref via GitHub (hadjdeh/football-data-analysis). Outfields 2018–2024 + saison courante.
+        200+ colonnes: buts, xG, passes progressives, pressings, duels, dribbles, touches zone, GCA…
+      </div>
+      <div class="meta">
+        Source: github.com/hadjdeh/football-data-analysis · old_seasons + current_season/
+      </div>
+      <div class="btn-row">
+        <button class="fbref" onclick="loadFBref('outfields_old')">Outfields 2018–2023</button>
+        <button class="fbref" onclick="loadFBref('outfields_current')">Outfields saison courante</button>
+        <button class="fbref" onclick="loadFBref('keeper_old')">Gardiens 2018–2023</button>
+        <button class="fbref" onclick="loadFBref('keeper_current')">Gardiens saison courante</button>
+        <button class="fbref" onclick="loadFBref('team_old')">Équipes 2018–2023</button>
+      </div>
+      <div class="progress-bar" id="prog-fbref"><div class="fill"></div></div>
+      <div class="status" id="status-fbref">En attente. Outfields old (~20–40 MB), peut prendre 20–60s. Gardiens + équipes plus légers.</div>
+    </div>
+  </div>
+
+  <!-- TRANSFERMARKT STATIC DATA -->
+  <div class="row" style="margin-bottom:0;">
+    <div class="source-card" style="border-left:4px solid #1a6b3a;">
+      <h2><span class="badge" style="background:#1a6b3a;color:white;">TM</span> Profils joueurs — Static data</h2>
+      <div class="desc">
+        Taille (cm), pied fort, nationalité — 37 000+ joueurs Transfermarkt, mis à jour hebdomadairement.
+        Poids extrait depuis FotMob Top 5 au moment de son chargement. Enrichit automatiquement toutes les sources via <code>window._playerProfiles</code>.
+      </div>
+      <div class="meta">Source: pub-e682421888d945d684bcae8890b0ec20.r2.dev/data/players.csv.gz</div>
+      <div class="btn-row">
+        <button style="background:#1a6b3a;color:white;" onclick="loadTransfermarkt()">⚽ Charger profils joueurs (TM)</button>
+        <button class="ghost" onclick="showProfileStats()">Stats dico</button>
+      </div>
+      <div class="progress-bar" id="prog-tm"><div class="fill"></div></div>
+      <div class="status" id="status-tm">En attente. Charge FotMob d'abord pour le poids.</div>
+    </div>
+  </div>
+
+  <div class="workbench">
+    <h2>Atelier d'analyse</h2>
+    <div class="controls">
+      <label>Dataset actif:</label>
+      <select id="dataset-select" onchange="renderTable()">
+        <option value="">— aucun chargé —</option>
+      </select>
+
+      <label>Filtre ligue:</label>
+      <select id="filter-league" onchange="renderTable()">
+        <option value="">Toutes</option>
+      </select>
+
+      <label>Filtre saison:</label>
+      <select id="filter-season" onchange="renderTable()">
+        <option value="">Toutes</option>
+      </select>
+
+      <label>Recherche:</label>
+      <input type="text" id="filter-search" placeholder="nom joueur, équipe…" oninput="renderTable()" style="min-width: 200px;">
+
+      <span style="flex: 1"></span>
+
+      <button class="ghost" onclick="exportData('json')">Export JSON</button>
+      <button class="ghost" onclick="exportData('csv')">Export CSV</button>
+      <button class="ghost" onclick="copyToClipboard()">Copier (JSON)</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="data-table">
+        <thead><tr><th>Charge un dataset pour commencer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="footer-bar">
+      <div class="row-count" id="row-count"></div>
+      <div>
+        <button class="ghost" onclick="document.getElementById('schema-details').open = !document.getElementById('schema-details').open">Voir schéma</button>
+      </div>
+    </div>
+
+    <details id="schema-details">
+      <summary>Schéma du dataset actif</summary>
+      <div class="schema-box" id="schema-box">—</div>
+    </details>
+  </div>
+
+  <!-- PLAYER LOOKUP -->
+  <div class="workbench" style="margin-top: 24px;">
+    <h2><span class="badge fotmob">FotMob</span> Stats avancées par joueur (Player Lookup)</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin: 0 0 16px 0;">
+      Pour chaque joueur FotMob individuellement : Passe, Attaque, Défense, Sortie de balle, ratings, etc.
+      FotMob bloque les requêtes cross-origin et impose un anti-bot — on contourne en lisant les données <em>directement depuis la page</em> via un bookmarklet.
+    </p>
+
+    <div class="lookup-grid">
+      <div class="lookup-card">
+        <h3>Étape 1 — Installer le bookmarklet (une fois)</h3>
+        <div class="step">
+          <ol>
+            <li>Affiche la barre de favoris du navigateur (<code>Ctrl/Cmd + Shift + B</code>)</li>
+            <li>Glisse-dépose ce bouton dans la barre :</li>
+          </ol>
+          <a class="bookmarklet-link" href="javascript:(function(){try{var d=document.getElementById('__NEXT_DATA__');if(!d){alert('Pas de __NEXT_DATA__. Es-tu sur fotmob.com/players/...?');return;}var pp=JSON.parse(d.textContent).props.pageProps;var blob={url:location.href,scrapedAt:new Date().toISOString(),pageProps:pp};navigator.clipboard.writeText(JSON.stringify(blob)).then(function(){alert('Stats joueur copiées dans le presse-papier. Va dans le Workbench et colle.');},function(e){var t=document.createElement('textarea');t.value=JSON.stringify(blob);t.style.cssText='position:fixed;top:10px;left:10px;width:80vw;height:80vh;z-index:99999';document.body.appendChild(t);t.select();try{document.execCommand('copy');alert('Copié (fallback). Tu peux retirer la textarea.');}catch(_){alert('Sélectionne tout, copie, et colle dans le Workbench.');}});}catch(e){alert('Erreur: '+e.message);}})();">⚽ FotMob → Workbench</a>
+          <div style="font-size: 11px; color: var(--text-dim);">Astuce: tu peux aussi clic droit sur le bouton → "Ajouter aux favoris".</div>
+        </div>
+      </div>
+
+      <div class="lookup-card">
+        <h3>Étape 2 — Capturer un joueur</h3>
+        <div class="step">
+          <ol>
+            <li>Va sur la page d'un joueur, ex: <code>fotmob.com/players/12994/lionel-messi</code></li>
+            <li>Attends que la page soit chargée</li>
+            <li>Clique sur le bookmarklet "⚽ FotMob → Workbench"</li>
+            <li>Reviens ici et colle (<code>Ctrl/Cmd + V</code>) dans le champ ci-dessous</li>
+          </ol>
+        </div>
+        <textarea id="json-paste" placeholder='Colle ici le JSON copié par le bookmarklet…'></textarea>
+        <div class="btn-row" style="margin-top: 8px;">
+          <button onclick="parsePlayerJSON()">Analyser le JSON</button>
+          <button class="ghost" onclick="document.getElementById('json-paste').value=''">Vider</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="roster" id="roster" style="display:none;">
+      <div class="roster-header">
+        <h4>Joueurs capturés (<span id="roster-count">0</span>)</h4>
+        <div>
+          <button class="ghost" onclick="selectAllPlayers(true)">Tout cocher</button>
+          <button class="ghost" onclick="selectAllPlayers(false)">Tout décocher</button>
+          <button onclick="compareSelected()">Comparer les sélectionnés</button>
+          <button class="ghost danger" onclick="clearRoster()">Vider tout</button>
+        </div>
+      </div>
+      <div class="roster-list" id="roster-list"></div>
+    </div>
+
+    <div id="player-display" style="margin-top: 24px;"></div>
+    <div id="compare-display" style="margin-top: 24px;"></div>
+  </div>
+
+  <div class="help" style="margin-top: 24px;">
+    <strong>Accès programmatique :</strong> Ouvre la console (F12) → tape <code>window.data</code> pour voir tous les datasets chargés. <code>window.data.player_current</code> contient le dernier joueur capturé. Tu peux faire des analyses directement en JS, ou copier vers ton notebook Python (via <code>copy(window.data)</code> dans la console Chrome).
+  </div>
+
+  <!-- FBREF BOOKMARKLET -->
+  <div class="workbench" style="margin-top: 24px;">
+    <h2><span class="badge fbref">FBref</span> Capture par bookmarklet (joueurs &amp; équipes)</h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin: 0 0 16px 0;">
+      FBref bloque les requêtes cross-origin. Même principe que FotMob : un bookmarklet lit les données
+      directement depuis la page ouverte dans ton navigateur, puis les colle ici.
+      Deux bookmarklets disponibles : <strong>joueur</strong> et <strong>équipe</strong>.
+    </p>
+
+    <div class="lookup-grid">
+      <div class="lookup-card">
+        <h3>Étape 1 — Installer les bookmarklets (une fois)</h3>
+        <div class="step">
+          <ol>
+            <li>Affiche la barre de favoris (<code>Ctrl/Cmd + Shift + B</code>)</li>
+            <li>Glisse chaque bouton dans la barre de favoris :</li>
+          </ol>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0;">
+            <a class="bookmarklet-link" href="javascript:(function(){try{var t=document.querySelector('table.stats_table');if(!t){t=document.querySelector('[id*=stats] table, table[id*=stats]');}if(!t){alert('Aucune table de stats trouvée. Es-tu sur une page joueur FBref (fbref.com/en/players/...)?');return;}var rows=Array.from(t.querySelectorAll('tr'));var headers=Array.from((t.querySelector('thead tr:last-child')||t.querySelector('thead tr')||rows[0]).querySelectorAll('th,td')).map(function(h){return(h.getAttribute('data-stat')||h.textContent).trim();});var data=rows.filter(function(r){return r.closest('thead')===null&&r.querySelector('td');}).map(function(r){var obj={};Array.from(r.querySelectorAll('th,td')).forEach(function(c,i){obj[headers[i]||('col'+i)]=c.getAttribute('data-value')||c.textContent.trim();});return obj;}).filter(function(r){return Object.values(r).some(function(v){return v!=='';});});var blob={source:'fbref',type:'player',url:location.href,scrapedAt:new Date().toISOString(),playerName:document.querySelector('h1 span')&&document.querySelector('h1 span').textContent.trim(),tableid:t.id,data:data};navigator.clipboard.writeText(JSON.stringify(blob)).then(function(){alert('Stats joueur FBref copiées ('+data.length+' lignes). Colle dans le Workbench.');},function(){var ta=document.createElement('textarea');ta.value=JSON.stringify(blob);ta.style.cssText='position:fixed;top:10px;left:10px;width:80vw;height:80vh;z-index:99999';document.body.appendChild(ta);ta.select();document.execCommand('copy');alert('Copié (fallback).');});}catch(e){alert('Erreur: '+e.message);}})();">📊 FBref Joueur → Workbench</a>
+            <a class="bookmarklet-link team" href="javascript:(function(){try{var tables=Array.from(document.querySelectorAll('table.stats_table,[id*=stats] table,table[id*=stats]'));if(!tables.length){alert('Aucune table stats trouvée. Es-tu sur une page équipe FBref (fbref.com/en/squads/...)?');return;}var allTables=tables.map(function(t){var rows=Array.from(t.querySelectorAll('tr'));var hrow=t.querySelector('thead tr:last-child')||t.querySelector('thead tr')||rows[0];var headers=Array.from(hrow.querySelectorAll('th,td')).map(function(h){return(h.getAttribute('data-stat')||h.textContent).trim();});var data=rows.filter(function(r){return r.closest('thead')===null&&r.querySelector('td');}).map(function(r){var obj={};Array.from(r.querySelectorAll('th,td')).forEach(function(c,i){obj[headers[i]||('col'+i)]=c.getAttribute('data-value')||c.textContent.trim();});return obj;}).filter(function(r){return Object.values(r).some(function(v){return v!=='';});});return{tableid:t.id,rows:data.length,data:data};}).filter(function(t){return t.data.length>0;});var blob={source:'fbref',type:'team',url:location.href,scrapedAt:new Date().toISOString(),teamName:document.querySelector('h1 span')&&document.querySelector('h1 span').textContent.trim(),tables:allTables};navigator.clipboard.writeText(JSON.stringify(blob)).then(function(){alert('Stats équipe FBref copiées ('+allTables.length+' tables). Colle dans le Workbench.');},function(){var ta=document.createElement('textarea');ta.value=JSON.stringify(blob);ta.style.cssText='position:fixed;top:10px;left:10px;width:80vw;height:80vh;z-index:99999';document.body.appendChild(ta);ta.select();document.execCommand('copy');alert('Copié (fallback).');});}catch(e){alert('Erreur: '+e.message);}})();">🏟️ FBref Équipe → Workbench</a>
+          </div>
+          <div style="font-size: 11px; color: var(--text-dim);">Astuce : clic droit → "Ajouter aux favoris" si le glisser-déposer ne fonctionne pas.</div>
+        </div>
+      </div>
+
+      <div class="lookup-card">
+        <h3>Étape 2 — Capturer</h3>
+        <div class="step">
+          <p><strong>Joueur :</strong> va sur <code>fbref.com/en/players/[id]/[nom]</code>, attends le chargement, clique "📊 FBref Joueur → Workbench".</p>
+          <p><strong>Équipe :</strong> va sur <code>fbref.com/en/squads/[id]/[equipe]</code>, clique "🏟️ FBref Équipe → Workbench".</p>
+          <p>Reviens ici et colle (<code>Ctrl/Cmd + V</code>) ci-dessous.</p>
+        </div>
+        <div class="fbref-paste-section">
+          <textarea class="fbref-paste" id="fbref-json-paste" placeholder="Colle ici le JSON copié par le bookmarklet FBref…"></textarea>
+          <div class="btn-row" style="margin-top: 8px;">
+            <button class="fbref" onclick="parseFBrefJSON()">Analyser le JSON FBref</button>
+            <button class="ghost" onclick="document.getElementById('fbref-json-paste').value=''">Vider</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fbref-display" style="margin-top: 20px;"></div>
+  </div>
+
+  <!-- RECOMMENDER -->
+  <div class="workbench" style="margin-top: 24px;" id="recommender-section">
+    <h2>🎯 Moteur de recommandation <span style="font-size:12px;font-weight:400;color:var(--text-dim);">joueur → équipe · basé sur Understat</span></h2>
+    <p style="color: var(--text-dim); font-size: 13px; margin: 0 0 16px 0;">
+      Charge d'abord les données Understat : soit <strong>⚡ Understat Live</strong> (données fraîches, recommandé) soit <strong>Understat saison 2025/26</strong> via GitHub. Le moteur normalise les stats par poste (percentiles),
+      construit le profil de l'équipe cible, puis calcule la similarité cosinus entre chaque joueur et le trou à combler.
+    </p>
+
+    <div class="rec-controls">
+      <div>
+        <label for="rec-team">Équipe cible</label>
+        <select id="rec-team" style="width:100%">
+          <option value="">— charge Understat d'abord —</option>
+        </select>
+      </div>
+      <div>
+        <label for="rec-position">Poste recherché</label>
+        <select id="rec-position" style="width:100%">
+          <option value="">Tous postes</option>
+          <option value="F">Attaquant (F)</option>
+          <option value="M">Milieu (M)</option>
+          <option value="D">Défenseur (D)</option>
+          <option value="GK">Gardien (GK)</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="recommender" onclick="runRecommender()" id="btn-run-rec" style="white-space:nowrap;">▶ Lancer l'analyse</button>
+        <button class="ghost" onclick="document.getElementById('rec-results').innerHTML='';document.getElementById('rec-team-profile').innerHTML=''">Effacer</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <label style="font-size:12px;color:var(--text-dim);">Ligues incluses :</label>
+      <label style="font-size:12px;"><input type="checkbox" id="rec-lig-La-liga" checked> La Liga</label>
+      <label style="font-size:12px;"><input type="checkbox" id="rec-lig-EPL" checked> Premier League</label>
+      <label style="font-size:12px;"><input type="checkbox" id="rec-lig-Serie-A" checked> Serie A</label>
+      <label style="font-size:12px;"><input type="checkbox" id="rec-lig-Bundesliga" checked> Bundesliga</label>
+      <label style="font-size:12px;"><input type="checkbox" id="rec-lig-Ligue-1" checked> Ligue 1</label>
+      <span style="flex:1"></span>
+      <label style="font-size:12px;color:var(--text-dim);">Min. minutes :</label>
+      <input type="number" id="rec-min-min" value="500" min="0" max="3400" step="100" style="width:70px;">
+      <label style="font-size:12px;color:var(--text-dim);">Top N :</label>
+      <input type="number" id="rec-top-n" value="10" min="3" max="50" style="width:55px;">
+    </div>
+
+    <div id="rec-team-profile"></div>
+    <div id="rec-status" class="status" style="display:none;"></div>
+    <div id="rec-results" class="rec-results"></div>
+  </div>
+
+  <div class="help" style="margin-top: 24px;">
+    <strong>Accès programmatique :</strong> Ouvre la console (F12) → tape <code>window.data</code> pour voir tous les datasets chargés. <code>window.data.player_current</code> contient le dernier joueur FotMob capturé. <code>window.data._fbref_last</code> contient la dernière capture FBref.
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- Global state ----------
+window.data = {};                  // datasets chargés, keyed by ID
+let activeDatasetId = null;
+let sortColumn = null;
+let sortDir = 1;
+
+// ---------- URLs sources ----------
+const URLS = {
+  understat_historical: 'https://raw.githubusercontent.com/vibedatascience/understat_players_aggregated/main/understat_players_aggregated_2014_2024.csv',
+  understat_current:    'https://raw.githubusercontent.com/vibedatascience/understat_players_aggregated/main/understat_players_aggregated_2025_latest.csv',
+  understat_full:       'https://raw.githubusercontent.com/vibedatascience/understat_players_aggregated/main/understat_players_aggregated_2014_td.csv',
+  fotmob_top5:          'https://raw.githubusercontent.com/gsapoz/topfive-api/main/topfive.json',
+  // FBref – hadjdeh/football-data-analysis
+  // old_seasons: fichiers statiques connus
+  fbref_outfields_old:  'https://raw.githubusercontent.com/hadjdeh/football-data-analysis/main/data/old_seasons/top5_leagues_outfields_2018_2019__2022_2023.csv',
+  fbref_keeper_old:     'https://raw.githubusercontent.com/hadjdeh/football-data-analysis/main/data/old_seasons/top5_leagues_keeper_2018_2019__2022_2023.csv',
+  fbref_team_old:       'https://raw.githubusercontent.com/hadjdeh/football-data-analysis/main/data/old_seasons/top5_leagues_team_2018_2019__2022_2023.csv',
+  // current_season: dossier horodaté → découverte via GitHub API
+  fbref_current_season_api: 'https://api.github.com/repos/hadjdeh/football-data-analysis/git/trees/main?recursive=1',
+};
+
+// ---------- Status helpers ----------
+function setStatus(id, msg, cls) {
+  const el = document.getElementById('status-' + id);
+  el.className = 'status ' + (cls || '');
+  el.textContent = msg;
+}
+function setProgress(id, pct) {
+  const bar = document.getElementById('prog-' + id);
+  if (pct === null) { bar.classList.remove('active'); return; }
+  bar.classList.add('active');
+  bar.querySelector('.fill').style.width = pct + '%';
+}
+
+// ---------- CSV parser (RFC 4180-ish, handles quotes) ----------
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false, i = 0;
+  const len = text.length;
+  while (i < len) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i+1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    } else {
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ',') { row.push(field); field = ''; i++; continue; }
+      if (c === '\r') { i++; continue; }
+      if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+      field += c; i++; continue;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const header = rows[0];
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    if (rows[r].length === 1 && rows[r][0] === '') continue;
+    const obj = {};
+    for (let c = 0; c < header.length; c++) {
+      let v = rows[r][c];
+      if (v === undefined) v = '';
+      // try numeric
+      if (v !== '' && !isNaN(v) && !isNaN(parseFloat(v))) v = parseFloat(v);
+      obj[header[c]] = v;
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+// ---------- Loaders ----------
+async function loadUnderstat(variant) {
+  const url = URLS['understat_' + variant];
+  const id = 'understat_' + variant;
+  setStatus('understat', 'Téléchargement en cours…', 'loading');
+  setProgress('understat', 10);
+  try {
+    const t0 = Date.now();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setProgress('understat', 50);
+    const text = await res.text();
+    setStatus('understat', 'Parsing CSV (' + (text.length / 1024 / 1024).toFixed(1) + ' MB)…', 'loading');
+    setProgress('understat', 75);
+    // Parse asynchronously to keep UI responsive
+    await new Promise(r => setTimeout(r, 50));
+    const rows = parseCSV(text);
+    setProgress('understat', 100);
+    window.data[id] = { source: 'Understat', variant, rows, url, loaded_at: new Date().toISOString() };
+    // Build position dictionary from any Understat CSV load
+    buildPositionDict(rows);
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    setStatus('understat', '✓ ' + rows.length.toLocaleString() + ' lignes chargées en ' + dt + 's', 'success');
+    addDatasetToSelector(id, 'Understat — ' + variant + ' (' + rows.length + ' lignes)');
+    setTimeout(() => setProgress('understat', null), 1000);
+  } catch (e) {
+    setStatus('understat', '✗ Erreur: ' + e.message, 'error');
+    setProgress('understat', null);
+  }
+}
+
+async function loadFotMob() {
+  setStatus('fotmob', 'Téléchargement en cours…', 'loading');
+  setProgress('fotmob', 20);
+  try {
+    const t0 = Date.now();
+    const res = await fetch(URLS.fotmob_top5);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setProgress('fotmob', 60);
+    const json = await res.json();
+    setProgress('fotmob', 90);
+
+    // Flatten the JSON to a row format for the table while keeping raw structure
+    const flat = flattenFotMob(json);
+    window.data['fotmob_top5'] = {
+      source: 'FotMob',
+      variant: 'top5',
+      raw: json,
+      rows: flat,
+      url: URLS.fotmob_top5,
+      loaded_at: new Date().toISOString()
+    };
+    // Extraire height, weight, nationality depuis FotMob vers _playerProfiles
+    const profCount = extractProfilesFromFotMob(json);
+    setProgress('fotmob', 100);
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    setStatus('fotmob', `✓ ${flat.length.toLocaleString()} joueurs/entités chargés en ${dt}s · ${profCount} profils physiques extraits`, 'success');
+    addDatasetToSelector('fotmob_top5', 'FotMob — Top 5 (' + flat.length + ' lignes)');
+    setTimeout(() => setProgress('fotmob', null), 1000);
+  } catch (e) {
+    setStatus('fotmob', '✗ Erreur: ' + e.message, 'error');
+    setProgress('fotmob', null);
+  }
+}
+
+// ---------- FBref loader ----------
+// current_season: le dossier est horodaté (ex: data/current_season/2024-11-15/)
+// On utilise l'API GitHub tree pour découvrir le chemin exact.
+async function loadFBref(variant) {
+  setStatus('fbref', 'Initialisation…', 'loading');
+  setProgress('fbref', 5);
+  try {
+    const t0 = Date.now();
+    let url;
+
+    if (variant.endsWith('_old')) {
+      // Fichiers old_seasons — URL directe connue
+      url = URLS['fbref_' + variant];
+      if (!url) throw new Error('Variante inconnue: ' + variant);
+    } else {
+      // current_season — découverte via GitHub API tree
+      setStatus('fbref', 'Découverte du dossier current_season via GitHub API…', 'loading');
+      const fileKey = variant === 'outfields_current' ? 'outfields' : 'keeper';
+      const treeRes = await fetch(URLS.fbref_current_season_api);
+      if (!treeRes.ok) throw new Error('GitHub API HTTP ' + treeRes.status);
+      const treeData = await treeRes.json();
+      const files = (treeData.tree || []).map(t => t.path);
+      // Cherche: data/current_season/.../top5_leagues_<fileKey>_XXXX_XXXX.csv
+      const match = files.find(p =>
+        p.includes('current_season') &&
+        p.includes(fileKey) &&
+        p.endsWith('.csv')
+      );
+      if (!match) throw new Error('Fichier current_season/' + fileKey + ' introuvable dans le repo GitHub. Le repo a peut-être une structure différente.');
+      url = 'https://raw.githubusercontent.com/hadjdeh/football-data-analysis/main/' + match;
+      setStatus('fbref', 'Fichier trouvé: ' + match.split('/').pop() + ' — Téléchargement…', 'loading');
+    }
+
+    setProgress('fbref', 15);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + url);
+    setProgress('fbref', 50);
+
+    const text = await res.text();
+    const sizeMB = (text.length / 1024 / 1024).toFixed(1);
+    setStatus('fbref', 'Parsing CSV (' + sizeMB + ' MB)…', 'loading');
+    setProgress('fbref', 70);
+
+    await new Promise(r => setTimeout(r, 50)); // yield UI
+    const rows = parseCSV(text);
+    setProgress('fbref', 100);
+
+    const id = 'fbref_' + variant;
+    window.data[id] = { source: 'FBref', variant, rows, url, loaded_at: new Date().toISOString() };
+
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    const label = 'FBref — ' + variant + ' (' + rows.length.toLocaleString() + ' lignes, ' + sizeMB + ' MB)';
+    setStatus('fbref', '✓ ' + rows.length.toLocaleString() + ' lignes en ' + dt + 's · ' + sizeMB + ' MB · ' + (rows[0] ? Object.keys(rows[0]).length : '?') + ' colonnes', 'success');
+    addDatasetToSelector(id, label);
+    setTimeout(() => setProgress('fbref', null), 1000);
+  } catch (e) {
+    setStatus('fbref', '✗ Erreur: ' + e.message, 'error');
+    setProgress('fbref', null);
+  }
+}
+
+// Generic flattener for FotMob top5 JSON (structure unknown — discover dynamically)
+function flattenFotMob(json) {
+  const flat = [];
+
+  function walkPlayers(obj, ctx) {
+    // Heuristics: look for arrays of player-like objects
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        if (item && typeof item === 'object') {
+          // does it look like a player? has 'name' or 'id' and few keys
+          const keys = Object.keys(item);
+          if (keys.includes('name') || keys.includes('playerName') || keys.includes('player')) {
+            flat.push({ ...ctx, ...flattenObject(item) });
+          } else {
+            walkPlayers(item, ctx);
+          }
+        }
+      }
+    } else if (obj && typeof obj === 'object') {
+      const newCtx = { ...ctx };
+      // capture league/team metadata into context
+      for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        if (typeof v === 'string' || typeof v === 'number') {
+          if (['league', 'leagueName', 'name', 'teamName', 'team'].includes(k)) {
+            newCtx[k] = v;
+          }
+        }
+      }
+      for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        if (typeof v === 'object' && v !== null) walkPlayers(v, newCtx);
+      }
+    }
+  }
+
+  walkPlayers(json, {});
+
+  // If no player-like structure found, fall back: flatten top-level
+  if (flat.length === 0 && Array.isArray(json)) {
+    for (const item of json) flat.push(flattenObject(item));
+  } else if (flat.length === 0 && typeof json === 'object') {
+    flat.push(flattenObject(json));
+  }
+  return flat;
+}
+
+function flattenObject(obj, prefix = '') {
+  const out = {};
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    const key = prefix ? prefix + '.' + k : k;
+    if (v === null || v === undefined) { out[key] = ''; }
+    else if (typeof v === 'object' && !Array.isArray(v)) {
+      Object.assign(out, flattenObject(v, key));
+    } else if (Array.isArray(v)) {
+      out[key] = JSON.stringify(v).slice(0, 200);
+    } else {
+      out[key] = v;
+    }
+  }
+  return out;
+}
+
+// ---------- Dataset selector ----------
+function addDatasetToSelector(id, label) {
+  const sel = document.getElementById('dataset-select');
+  // remove existing entry if reload
+  for (const opt of sel.options) {
+    if (opt.value === id) sel.removeChild(opt);
+  }
+  const opt = document.createElement('option');
+  opt.value = id;
+  opt.textContent = label;
+  sel.appendChild(opt);
+  sel.value = id;
+  renderTable();
+}
+
+// ---------- Render table ----------
+function renderTable() {
+  const sel = document.getElementById('dataset-select');
+  activeDatasetId = sel.value;
+  const table = document.getElementById('data-table');
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  const rowCount = document.getElementById('row-count');
+
+  if (!activeDatasetId || !window.data[activeDatasetId]) {
+    thead.innerHTML = '<tr><th>Charge un dataset pour commencer</th></tr>';
+    tbody.innerHTML = '';
+    rowCount.textContent = '';
+    document.getElementById('schema-box').textContent = '—';
+    document.getElementById('filter-league').innerHTML = '<option value="">Toutes</option>';
+    document.getElementById('filter-season').innerHTML = '<option value="">Toutes</option>';
+    return;
+  }
+
+  const ds = window.data[activeDatasetId];
+  let rows = ds.rows;
+
+  // populate filter dropdowns
+  updateFilterDropdown('filter-league', rows, ['league', 'leagueName']);
+  updateFilterDropdown('filter-season', rows, ['season', 'year']);
+
+  // apply filters
+  const leagueF = document.getElementById('filter-league').value;
+  const seasonF = document.getElementById('filter-season').value;
+  const searchF = document.getElementById('filter-search').value.toLowerCase();
+
+  rows = rows.filter(r => {
+    if (leagueF) {
+      const v = r.league || r.leagueName || '';
+      if (String(v) !== leagueF) return false;
+    }
+    if (seasonF) {
+      const v = r.season !== undefined ? r.season : r.year;
+      if (String(v) !== seasonF) return false;
+    }
+    if (searchF) {
+      const hay = Object.values(r).join(' ').toLowerCase();
+      if (!hay.includes(searchF)) return false;
+    }
+    return true;
+  });
+
+  // sort
+  if (sortColumn) {
+    rows = [...rows].sort((a, b) => {
+      const va = a[sortColumn], vb = b[sortColumn];
+      if (va === vb) return 0;
+      if (va === undefined || va === '') return 1;
+      if (vb === undefined || vb === '') return -1;
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sortDir;
+      return String(va).localeCompare(String(vb)) * sortDir;
+    });
+  }
+
+  // build header
+  const cols = rows.length ? Object.keys(rows[0]) : (ds.rows.length ? Object.keys(ds.rows[0]) : []);
+  thead.innerHTML = '<tr>' + cols.map(c =>
+    `<th onclick="onSort('${c.replace(/'/g, "\\'")}')">${c}${sortColumn === c ? '<span class="sort-indicator">' + (sortDir === 1 ? '▲' : '▼') + '</span>' : ''}</th>`
+  ).join('') + '</tr>';
+
+  // body — virtualization-lite: cap at 1000 visible rows
+  const MAX_RENDER = 1000;
+  const slice = rows.slice(0, MAX_RENDER);
+  tbody.innerHTML = slice.map(r =>
+    '<tr>' + cols.map(c => {
+      const v = r[c];
+      const isNum = typeof v === 'number';
+      return `<td class="${isNum ? 'numeric' : ''}">${v === undefined || v === null ? '' : escapeHtml(String(v))}</td>`;
+    }).join('') + '</tr>'
+  ).join('');
+
+  const visible = Math.min(rows.length, MAX_RENDER);
+  rowCount.textContent = `${rows.length.toLocaleString()} ligne${rows.length > 1 ? 's' : ''} (${ds.rows.length.toLocaleString()} au total)${rows.length > MAX_RENDER ? ` — ${visible} affichées, exporte pour tout récupérer` : ''}`;
+
+  // schema
+  renderSchema(ds.rows);
+}
+
+function updateFilterDropdown(elId, rows, fieldNames) {
+  const sel = document.getElementById(elId);
+  const current = sel.value;
+  const vals = new Set();
+  for (const r of rows) {
+    for (const f of fieldNames) {
+      if (r[f] !== undefined && r[f] !== '') { vals.add(String(r[f])); break; }
+    }
+  }
+  const sorted = [...vals].sort();
+  sel.innerHTML = '<option value="">Toutes</option>' + sorted.map(v => `<option value="${escapeHtml(v)}" ${v === current ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
+}
+
+function onSort(col) {
+  if (sortColumn === col) sortDir = -sortDir;
+  else { sortColumn = col; sortDir = 1; }
+  renderTable();
+}
+
+function renderSchema(rows) {
+  if (!rows.length) { document.getElementById('schema-box').textContent = '(vide)'; return; }
+  const sample = rows[0];
+  const types = {};
+  for (const k of Object.keys(sample)) {
+    const v = sample[k];
+    types[k] = typeof v === 'number' ? 'number' : (typeof v === 'boolean' ? 'boolean' : 'string');
+  }
+  const html = Object.entries(types).map(([k, t]) =>
+    `<span class="key">${k}</span>: <span class="type">${t}</span>`
+  ).join('<br>');
+  document.getElementById('schema-box').innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---------- Export ----------
+function getFilteredRows() {
+  if (!activeDatasetId) return null;
+  const ds = window.data[activeDatasetId];
+  const leagueF = document.getElementById('filter-league').value;
+  const seasonF = document.getElementById('filter-season').value;
+  const searchF = document.getElementById('filter-search').value.toLowerCase();
+  return ds.rows.filter(r => {
+    if (leagueF) { const v = r.league || r.leagueName || ''; if (String(v) !== leagueF) return false; }
+    if (seasonF) { const v = r.season !== undefined ? r.season : r.year; if (String(v) !== seasonF) return false; }
+    if (searchF) { const hay = Object.values(r).join(' ').toLowerCase(); if (!hay.includes(searchF)) return false; }
+    return true;
+  });
+}
+
+function exportData(format) {
+  const rows = getFilteredRows();
+  if (!rows) { alert('Aucun dataset chargé.'); return; }
+  let blob, ext, mime;
+  if (format === 'json') {
+    blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+    ext = 'json'; mime = 'application/json';
+  } else {
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    const csv = [cols.join(',')].concat(rows.map(r =>
+      cols.map(c => {
+        let v = r[c];
+        if (v === undefined || v === null) return '';
+        v = String(v);
+        if (/[",\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+        return v;
+      }).join(',')
+    )).join('\n');
+    blob = new Blob([csv], { type: 'text/csv' });
+    ext = 'csv'; mime = 'text/csv';
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${activeDatasetId}_${rows.length}rows.${ext}`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function copyToClipboard() {
+  const rows = getFilteredRows();
+  if (!rows) { alert('Aucun dataset chargé.'); return; }
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(rows, null, 2));
+    alert(rows.length + ' lignes copiées au presse-papier (JSON)');
+  } catch (e) {
+    alert('Erreur clipboard: ' + e.message);
+  }
+}
+
+// =====================================================================
+// FOTMOB PLAYER LOOKUP — parsing + rendering
+// =====================================================================
+
+function toast(msg, isError) {
+  const t = document.getElementById('toast');
+  if (!t) { (isError ? console.error : console.log)(msg); return; }
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { t.className = 'toast' + (isError ? ' error' : ''); }, 2600);
+}
+
+const CATEGORY_MATCHERS = [
+  { id: 'top', label: 'Stats principales', icon: '⭐',
+    titleKeys: ['top stats', 'main stats', 'overall', 'principal', 'général', 'general', 'rating'] },
+  { id: 'passe', label: 'Passe', icon: '🅿️',
+    titleKeys: ['passing', 'passes', 'pass', 'passe'] },
+  { id: 'attaque', label: 'Attaque', icon: '🎯',
+    titleKeys: ['attack', 'attacking', 'shooting', 'shots', 'attaque', 'finition', 'finishing'] },
+  { id: 'defense', label: 'Défense', icon: '🛡️',
+    titleKeys: ['defense', 'defending', 'defensive', 'défense'] },
+  { id: 'sortie', label: 'Sortie de balle', icon: '⚽',
+    titleKeys: ['possession', 'on the ball', 'ball control', 'with ball', 'sortie de balle', 'ball recovery', 'duel'] },
+  { id: 'discipline', label: 'Discipline', icon: '🟨',
+    titleKeys: ['discipline', 'cards', 'fouls'] },
+];
+
+function matchCategory(title) {
+  if (!title) return null;
+  const t = String(title).toLowerCase();
+  for (const cat of CATEGORY_MATCHERS) {
+    if (cat.titleKeys.some(k => t.includes(k))) return cat;
+  }
+  return null;
+}
+
+function looksLikeStatItem(o) {
+  if (!o || typeof o !== 'object') return false;
+  const keys = Object.keys(o).map(k => k.toLowerCase());
+  const hasName = keys.includes('name') || keys.includes('localizedtitlekey') || keys.includes('title') || keys.includes('key');
+  const hasValue = keys.includes('value') || keys.includes('statvalue') || keys.includes('statvalueformatted') || keys.includes('valuetext');
+  return hasName && hasValue;
+}
+
+function extractItemFields(o) {
+  const name = o.name || o.localizedTitleKey || o.title || o.key || '(?)';
+  let value = o.statValueFormatted || o.statValue || o.value || o.valueText || '';
+  if (typeof value === 'object' && value !== null) value = value.value !== undefined ? value.value : JSON.stringify(value);
+  let percentile = null;
+  for (const k of ['percentile', 'rank', 'percentileRank', 'isHighlighted', 'highlighted', 'highlight']) {
+    if (o[k] !== undefined) { percentile = o[k]; break; }
+  }
+  return { name: String(name), value: value, percentile, raw: o };
+}
+
+function computeAgeFromDOB(value) {
+  // Accepts ISO date string, "yyyy-mm-dd", or unix ms (number).
+  // Returns age in completed years, or null if invalid / not plausible.
+  let d = null;
+  if (typeof value === 'number') {
+    // Unix ms — heuristic: > 1e11 means a date in ms (~1973+); < that, probably year only.
+    if (value > 1e11) d = new Date(value);
+    else if (value > 1900 && value < 2030) {
+      // Year only: assume mid-year for stable rounding
+      d = new Date(value, 5, 30);
+    }
+  } else if (typeof value === 'string' && value) {
+    const t = Date.parse(value);
+    if (!isNaN(t)) d = new Date(t);
+  }
+  if (!d || isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const mDiff = now.getMonth() - d.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && now.getDate() < d.getDate())) age--;
+  if (age < 14 || age > 50) return null;
+  return age;
+}
+
+function extractPlayerStats(root) {
+  const found = [];
+  const playerMeta = { name: null, team: null, league: null, position: null, age: null, image: null, id: null };
+  // Age candidates: choose best at the end. {age, pathDepth, fromDOB}
+  const ageCandidates = [];
+  function walk(obj, path) {
+    if (!obj) return;
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) walk(obj[i], path.concat('[' + i + ']'));
+      return;
+    }
+    if (typeof obj !== 'object') return;
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      const kl = k.toLowerCase();
+
+      // ---- DOB-based age (most reliable) ----
+      if (['birthdate', 'dateofbirth', 'dob', 'birthday'].includes(kl)) {
+        const a = computeAgeFromDOB(v);
+        if (a !== null) ageCandidates.push({ age: a, pathDepth: path.length, fromDOB: true });
+      }
+
+      if (typeof v === 'string' || typeof v === 'number') {
+        if (kl === 'name' && !playerMeta.name && path.some(p => /player|playerdata|profile/i.test(p))) playerMeta.name = v;
+        if ((kl === 'teamname' || kl === 'primaryteam' || kl === 'teamtitle') && !playerMeta.team) playerMeta.team = String(v);
+        if ((kl === 'leaguename' || kl === 'mainleague') && !playerMeta.league) playerMeta.league = String(v);
+        if ((kl === 'position' || kl === 'role') && !playerMeta.position) playerMeta.position = String(v);
+        // ---- Age field fallback: only as candidate, decided after the full walk ----
+        if (kl === 'age' && typeof v === 'number' && v >= 14 && v <= 50
+            && path.some(p => /player|playerdata|playerinfo|profile/i.test(p))) {
+          ageCandidates.push({ age: v, pathDepth: path.length, fromDOB: false });
+        }
+        if ((kl === 'imageurl' || kl === 'image') && !playerMeta.image && typeof v === 'string' && v.startsWith('http')) playerMeta.image = v;
+        if (kl === 'id' && !playerMeta.id && typeof v === 'number') playerMeta.id = v;
+      }
+    }
+    const title = obj.title || obj.name || obj.localizedTitleKey || obj.header;
+    const items = obj.items || obj.stats || obj.statList;
+    if (typeof title === 'string' && Array.isArray(items) && items.length > 0 && items.some(looksLikeStatItem)) {
+      const parsedItems = items.filter(looksLikeStatItem).map(extractItemFields);
+      if (parsedItems.length) found.push({ title, items: parsedItems });
+    }
+    for (const k of Object.keys(obj)) walk(obj[k], path.concat(k));
+  }
+  walk(root, []);
+
+  // Choose best age candidate: DOB-based first, then shortest path (most likely root player vs nested sidebar)
+  if (ageCandidates.length) {
+    ageCandidates.sort((a, b) => {
+      if (a.fromDOB !== b.fromDOB) return a.fromDOB ? -1 : 1;
+      return a.pathDepth - b.pathDepth;
+    });
+    playerMeta.age = ageCandidates[0].age;
+  }
+
+  const seen = new Set();
+  const dedup = [];
+  for (const c of found) {
+    const key = c.title + '|' + c.items.length;
+    if (seen.has(key)) continue;
+    seen.add(key); dedup.push(c);
+  }
+  return { meta: playerMeta, categories: dedup };
+}
+
+function parsePlayerJSON() {
+  const txt = document.getElementById('json-paste').value.trim();
+  if (!txt) { toast('Colle d\'abord le JSON.', true); return; }
+  let json;
+  try { json = JSON.parse(txt); }
+  catch (e) { toast('JSON invalide: ' + e.message, true); return; }
+  const { meta, categories } = extractPlayerStats(json);
+  const player = {
+    source: 'FotMob', raw: json, meta, categories,
+    captured_at: new Date().toISOString(),
+    uid: 'p' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    included: true
+  };
+  // Backwards compat: keep player_current pointing to most recent
+  window.data.player_current = player;
+  // Roster: push new player
+  if (!window.data.players) window.data.players = [];
+  // Avoid exact duplicates (same id + same captured stats count)
+  if (meta.id) {
+    const dupIdx = window.data.players.findIndex(p => p.meta.id === meta.id);
+    if (dupIdx >= 0) {
+      window.data.players[dupIdx] = player; // replace, refresh
+      toast('Joueur mis à jour: ' + (meta.name || '?'));
+    } else {
+      window.data.players.push(player);
+      toast('Joueur ajouté: ' + (meta.name || '?'));
+    }
+  } else {
+    window.data.players.push(player);
+    toast('Joueur ajouté: ' + (meta.name || '?'));
+  }
+  renderRoster();
+  renderPlayer(meta, categories, json);
+  // Clear paste field for next capture
+  document.getElementById('json-paste').value = '';
+  // Clear comparison view since roster changed
+  document.getElementById('compare-display').innerHTML = '';
+}
+
+// ---------- Roster management ----------
+function renderRoster() {
+  const players = window.data.players || [];
+  const box = document.getElementById('roster');
+  const list = document.getElementById('roster-list');
+  const count = document.getElementById('roster-count');
+  if (!players.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  count.textContent = players.length;
+  const activeUid = window.data.player_current ? window.data.player_current.uid : null;
+  list.innerHTML = players.map(p => {
+    const m = p.meta;
+    const img = m.image
+      ? `<img src="${escapeHtml(m.image)}" alt="">`
+      : `<div class="fallback">⚽</div>`;
+    const isActive = (p.uid === activeUid);
+    return `
+      <div class="roster-chip ${isActive ? 'is-active' : ''}" data-uid="${escapeHtml(p.uid)}">
+        <input type="checkbox" ${p.included ? 'checked' : ''} onchange="togglePlayerIncluded('${escapeHtml(p.uid)}', this.checked)" title="Inclure dans la comparaison">
+        ${img}
+        <span class="chip-body" onclick="viewPlayer('${escapeHtml(p.uid)}')" title="Voir la fiche solo">
+          <span class="chip-name">${escapeHtml(m.name || '(?)')}</span>
+          <span class="chip-meta">${escapeHtml(m.team || '')}${m.position ? ' · ' + escapeHtml(m.position) : ''}</span>
+        </span>
+        <button class="chip-remove" onclick="removePlayer('${escapeHtml(p.uid)}')" title="Retirer">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function viewPlayer(uid) {
+  const players = window.data.players || [];
+  const p = players.find(x => x.uid === uid);
+  if (!p) { toast('Joueur introuvable.', true); return; }
+  window.data.player_current = p;
+  // Hide comparison view to avoid confusion
+  document.getElementById('compare-display').innerHTML = '';
+  renderPlayer(p.meta, p.categories, p.raw);
+  renderRoster(); // refresh chip highlight
+  // Scroll into view
+  document.getElementById('player-display').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function togglePlayerIncluded(uid, included) {
+  const players = window.data.players || [];
+  const p = players.find(x => x.uid === uid);
+  if (p) p.included = included;
+}
+
+function removePlayer(uid) {
+  if (!window.data.players) return;
+  window.data.players = window.data.players.filter(p => p.uid !== uid);
+  renderRoster();
+  // Clear comparison view (roster changed)
+  document.getElementById('compare-display').innerHTML = '';
+  toast('Joueur retiré.');
+}
+
+function clearRoster() {
+  if (!window.data.players || !window.data.players.length) return;
+  if (!confirm('Vider tous les joueurs capturés?')) return;
+  window.data.players = [];
+  window.data.player_current = null;
+  renderRoster();
+  document.getElementById('player-display').innerHTML = '';
+  document.getElementById('compare-display').innerHTML = '';
+  toast('Roster vidé.');
+}
+
+function selectAllPlayers(included) {
+  if (!window.data.players) return;
+  for (const p of window.data.players) p.included = included;
+  renderRoster();
+}
+
+// ---------- Comparison view ----------
+function compareSelected() {
+  const players = (window.data.players || []).filter(p => p.included);
+  const display = document.getElementById('compare-display');
+  if (players.length < 2) {
+    display.innerHTML = `<div class="help" style="border-left-color: var(--warning);"><strong>Sélectionne au moins 2 joueurs</strong> dans le roster pour comparer.</div>`;
+    return;
+  }
+
+  // Cache l'affichage solo (sinon confusion entre les 2 vues)
+  document.getElementById('player-display').innerHTML = '';
+
+  // Build a unified list of (categoryBucket, statKey, displayName) across all players
+  // We group by inferred bucket (Passe/Attaque/Défense/etc) and by stat name (case-insensitive prettified key)
+
+  // Step 1: for each player, normalize categories into bucket + index of stats
+  const playerStats = players.map(p => {
+    const buckets = {}; // bucketLabel -> Map(statName -> {value, raw, percentile})
+    const ungrouped = {};
+    for (const cat of p.categories) {
+      const m = matchCategory(cat.title);
+      const bucketKey = m ? m.id : ('_other_' + cat.title);
+      const bucketLabel = m ? (m.icon + ' ' + m.label) : ('• ' + cat.title);
+      const target = (m ? buckets : ungrouped);
+      if (!target[bucketKey]) target[bucketKey] = { label: bucketLabel, stats: {} };
+      for (const it of cat.items) {
+        const norm = prettifyKey(it.name).toLowerCase();
+        if (!target[bucketKey].stats[norm]) {
+          target[bucketKey].stats[norm] = {
+            displayName: prettifyKey(it.name),
+            value: it.value,
+            raw: it.raw,
+            percentile: it.percentile
+          };
+        }
+      }
+    }
+    return { buckets, ungrouped };
+  });
+
+  // Step 2: union of bucket keys, preserving order
+  const bucketOrder = ['top', 'passe', 'attaque', 'defense', 'sortie', 'discipline'];
+  const seenBuckets = new Set();
+  const finalBuckets = []; // [{key, label, statKeys: [...]}]
+
+  // Pour chaque bucket connu, dans l'ordre
+  for (const id of bucketOrder) {
+    let label = null;
+    const statKeys = {};
+    for (const ps of playerStats) {
+      const b = ps.buckets[id];
+      if (!b) continue;
+      label = b.label;
+      for (const k of Object.keys(b.stats)) {
+        if (!statKeys[k]) statKeys[k] = b.stats[k].displayName;
+      }
+    }
+    if (label) {
+      finalBuckets.push({ id, label, statKeys });
+      seenBuckets.add(id);
+    }
+  }
+  // Buckets "_other_..." (ungrouped categories) à la fin, dans l'ordre d'apparition
+  const otherKeysOrder = [];
+  for (const ps of playerStats) {
+    for (const k of Object.keys(ps.ungrouped)) {
+      if (!otherKeysOrder.includes(k)) otherKeysOrder.push(k);
+    }
+  }
+  for (const k of otherKeysOrder) {
+    let label = null;
+    const statKeys = {};
+    for (const ps of playerStats) {
+      const b = ps.ungrouped[k];
+      if (!b) continue;
+      label = b.label;
+      for (const kk of Object.keys(b.stats)) {
+        if (!statKeys[kk]) statKeys[kk] = b.stats[kk].displayName;
+      }
+    }
+    finalBuckets.push({ id: k, label, statKeys });
+  }
+
+  // Step 3: build the table
+  const colHeader = players.map(p => {
+    const m = p.meta;
+    const img = m.image
+      ? `<img src="${escapeHtml(m.image)}" alt="">`
+      : `<div style="width:36px;height:36px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px;">⚽</div>`;
+    return `<th class="player-col"><div class="player-col-header">
+      ${img}
+      <span class="pcn">${escapeHtml(m.name || '?')}</span>
+      <span class="pcm">${escapeHtml(m.team || '')}</span>
+    </div></th>`;
+  }).join('');
+
+  let bodyHTML = '';
+  let totalRows = 0;
+  for (const bucket of finalBuckets) {
+    const statKeyList = Object.keys(bucket.statKeys);
+    if (!statKeyList.length) continue;
+    bodyHTML += `<tr class="category-row"><td colspan="${players.length + 1}">${escapeHtml(bucket.label)}</td></tr>`;
+    for (const sk of statKeyList) {
+      const displayName = bucket.statKeys[sk];
+      // Collect each player's value for this stat
+      const vals = playerStats.map((ps, idx) => {
+        const buckets = bucket.id.startsWith('_other_') ? ps.ungrouped : ps.buckets;
+        const b = buckets[bucket.id];
+        return b && b.stats[sk] ? b.stats[sk] : null;
+      });
+      // Determine numeric values for "best" highlighting and bars
+      const numericVals = vals.map(s => {
+        if (!s) return null;
+        const n = parseFloat(String(s.value).replace(/[^\d.,-]/g, '').replace(',', '.'));
+        return isNaN(n) ? null : n;
+      });
+      const validNums = numericVals.filter(n => n !== null);
+      const isLowerBetter = /foul|carton|card|loss|loss of possession|errors|miscontrol|dispossess/i.test(displayName);
+      let bestIdx = -1;
+      if (validNums.length >= 2) {
+        // best = max or min depending on stat semantics
+        const best = isLowerBetter ? Math.min(...validNums) : Math.max(...validNums);
+        bestIdx = numericVals.findIndex(n => n === best);
+      }
+      const maxAbs = Math.max(0, ...validNums.map(n => Math.abs(n)));
+
+      let row = `<tr><td class="stat-label">${escapeHtml(displayName)}</td>`;
+      vals.forEach((s, i) => {
+        if (!s) {
+          row += `<td class="value-cell empty"><span class="v">—</span></td>`;
+        } else {
+          const isBest = (i === bestIdx);
+          const n = numericVals[i];
+          let barPct = 0;
+          if (n !== null && maxAbs > 0) barPct = Math.min(100, Math.max(4, Math.abs(n) / maxAbs * 100));
+          else barPct = 0;
+          const cls = isBest ? 'good' : (barPct >= 50 ? 'avg' : 'poor');
+          let dv = s.value;
+          if (typeof dv === 'number') dv = (dv % 1 === 0 ? dv : dv.toFixed(2));
+          row += `<td class="value-cell ${isBest ? 'is-best' : ''}">
+            <span class="v">${escapeHtml(String(dv))}</span>
+            ${n !== null ? `<span class="micro-bar"><span class="fill ${cls}" style="width:${barPct.toFixed(1)}%"></span></span>` : ''}
+          </td>`;
+        }
+      });
+      row += `</tr>`;
+      bodyHTML += row;
+      totalRows++;
+    }
+  }
+
+  display.innerHTML = `
+    <h3 style="margin: 0 0 12px 0;">Comparaison — ${players.length} joueurs</h3>
+    <div style="overflow:auto; max-height: 700px; border: 1px solid var(--border); border-radius: 6px;">
+      <table class="compare-table">
+        <thead><tr><th style="min-width:200px;">Stat</th>${colHeader}</tr></thead>
+        <tbody>${bodyHTML}</tbody>
+      </table>
+    </div>
+    <div class="footer-bar" style="margin-top:12px;">
+      <div class="row-count">${totalRows} stats comparées · meilleure valeur surlignée en vert</div>
+      <div>
+        <button class="ghost" onclick="exportComparison('csv')">Export CSV</button>
+        <button class="ghost" onclick="exportComparison('json')">Export JSON</button>
+      </div>
+    </div>
+    <div class="help" style="margin-top:10px;">
+      <strong>Lecture :</strong> chaque ligne est une stat, chaque colonne un joueur. La meilleure valeur de la ligne est surlignée en vert
+      (pour les stats où "moins est mieux" comme fautes/cartons, c'est l'inverse — détection automatique sur les noms FR/EN).
+      Les barres représentent la valeur relative aux autres joueurs sur la même ligne.
+    </div>
+  `;
+}
+
+function exportComparison(format) {
+  const players = (window.data.players || []).filter(p => p.included);
+  if (players.length < 2) { toast('Sélectionne au moins 2 joueurs.', true); return; }
+  // Reconstruct a long-format dataset
+  const out = [];
+  for (const p of players) {
+    for (const cat of p.categories) {
+      for (const it of cat.items) {
+        out.push({
+          player_name: p.meta.name,
+          player_id: p.meta.id,
+          team: p.meta.team,
+          league: p.meta.league,
+          position: p.meta.position,
+          category: cat.title,
+          stat: prettifyKey(it.name),
+          value: it.value,
+          percentile: it.percentile,
+        });
+      }
+    }
+  }
+  let blob, ext;
+  if (format === 'json') {
+    blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    ext = 'json';
+  } else {
+    const cols = ['player_name','player_id','team','league','position','category','stat','value','percentile'];
+    const csv = [cols.join(',')].concat(out.map(r =>
+      cols.map(c => {
+        let v = r[c];
+        if (v === undefined || v === null) return '';
+        v = String(v);
+        if (/[",\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+        return v;
+      }).join(',')
+    )).join('\n');
+    blob = new Blob([csv], { type: 'text/csv' });
+    ext = 'csv';
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `comparison_${players.length}players.${ext}`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`Comparaison exportée (${ext.toUpperCase()})`);
+}
+
+function renderPlayer(meta, categories, raw) {
+  const display = document.getElementById('player-display');
+  if (!categories.length) {
+    display.innerHTML = `
+      <div class="help" style="border-left-color: var(--warning);">
+        <strong>Aucune catégorie de stats trouvée dans le JSON.</strong><br>
+        Le JSON a bien été chargé mais le parser n'a pas reconnu de structure de catégories.
+        Le brut est dans <code>window.data.player_current.raw</code>. Si la structure FotMob a changé, montre-moi un échantillon et j'ajuste le parser.
+      </div>
+      <details><summary>Voir JSON brut</summary><div class="raw-json">${escapeHtml(JSON.stringify(raw, null, 2).slice(0, 50000))}</div></details>
+    `;
+    return;
+  }
+  const buckets = {};
+  const ungrouped = [];
+  for (const cat of categories) {
+    const m = matchCategory(cat.title);
+    if (m) {
+      if (!buckets[m.id]) buckets[m.id] = { label: m.label, icon: m.icon, cats: [] };
+      buckets[m.id].cats.push(cat);
+    } else ungrouped.push(cat);
+  }
+  const order = ['top', 'passe', 'attaque', 'defense', 'sortie', 'discipline'];
+
+  let html = `
+    <div class="player-header">
+      ${meta.image ? `<img src="${escapeHtml(meta.image)}" alt="">` : `<div style="width:64px;height:64px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:24px;">⚽</div>`}
+      <div>
+        <div class="name">${escapeHtml(meta.name || 'Joueur')}</div>
+        <div class="meta">
+          ${meta.team ? escapeHtml(meta.team) : ''}
+          ${meta.league ? ' • ' + escapeHtml(meta.league) : ''}
+          ${meta.position ? ' • ' + escapeHtml(meta.position) : ''}
+          ${meta.age ? ' • ' + escapeHtml(String(meta.age)) + ' ans' : ''}
+        </div>
+      </div>
+    </div>
+    <div class="stat-categories">
+  `;
+  for (const id of order) {
+    if (buckets[id]) {
+      for (const cat of buckets[id].cats) {
+        const lbl = buckets[id].icon + ' ' + buckets[id].label + (cat.title.toLowerCase() !== buckets[id].label.toLowerCase() ? ' — ' + cat.title : '');
+        html += renderStatCategory(lbl, cat.items);
+      }
+    }
+  }
+  for (const cat of ungrouped) html += renderStatCategory('• ' + cat.title, cat.items);
+  html += `</div>`;
+  html += `
+    <div class="footer-bar" style="margin-top:20px;">
+      <div class="row-count">${categories.reduce((s,c) => s + c.items.length, 0)} stats parsées sur ${categories.length} catégories</div>
+      <div>
+        <button class="ghost" onclick="exportPlayer('json')">Export JSON</button>
+        <button class="ghost" onclick="exportPlayer('csv')">Export CSV (flat)</button>
+        <button class="ghost" onclick="copyPlayerToClipboard()">Copier (JSON)</button>
+      </div>
+    </div>
+    <details style="margin-top:12px;"><summary>Voir JSON brut FotMob</summary><div class="raw-json">${escapeHtml(JSON.stringify(raw, null, 2).slice(0, 100000))}${JSON.stringify(raw).length > 100000 ? '\n…(tronqué, accès complet via window.data.player_current.raw)' : ''}</div></details>
+  `;
+  display.innerHTML = html;
+}
+
+function renderStatCategory(title, items) {
+  let maxNumeric = 0;
+  for (const it of items) {
+    const n = parseFloat(String(it.value).replace(/[^\d.,-]/g, '').replace(',', '.'));
+    if (!isNaN(n)) maxNumeric = Math.max(maxNumeric, Math.abs(n));
+  }
+  let html = `<div class="stat-category"><h4>${escapeHtml(title)}</h4>`;
+  for (const it of items) {
+    const rawN = parseFloat(String(it.value).replace(/[^\d.,-]/g, '').replace(',', '.'));
+    const valNum = isNaN(rawN) ? null : rawN;
+    let pct = 0;
+    if (it.percentile !== null && it.percentile !== undefined) {
+      if (typeof it.percentile === 'number') pct = Math.min(100, Math.max(0, it.percentile));
+      else if (it.percentile === true) pct = 80;
+      else if (it.percentile === false) pct = 30;
+    } else if (valNum !== null && maxNumeric > 0) {
+      pct = Math.min(100, Math.max(4, Math.abs(valNum) / maxNumeric * 100));
+    } else pct = 50;
+    const cls = pct >= 70 ? 'good' : (pct >= 40 ? 'avg' : 'poor');
+    let displayValue = it.value;
+    if (typeof displayValue === 'number') displayValue = (displayValue % 1 === 0 ? displayValue : displayValue.toFixed(2));
+    html += `
+      <div class="stat-row">
+        <div class="stat-name">${escapeHtml(prettifyKey(it.name))}</div>
+        <div class="stat-value">${escapeHtml(String(displayValue))}</div>
+        <div class="stat-bar"><div class="fill ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
+      </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function prettifyKey(k) {
+  if (!k) return '';
+  return String(k)
+    .replace(/[_.]/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, c => c.toUpperCase());
+}
+
+function getCurrentPlayerFlat() {
+  const p = window.data.player_current;
+  if (!p) return null;
+  const flat = [];
+  for (const cat of p.categories) {
+    for (const it of cat.items) {
+      flat.push({
+        category: cat.title,
+        stat: prettifyKey(it.name),
+        value: it.value,
+        percentile: it.percentile,
+        player_name: p.meta.name,
+        player_id: p.meta.id,
+        team: p.meta.team,
+        league: p.meta.league,
+      });
+    }
+  }
+  return flat;
+}
+
+function exportPlayer(format) {
+  const flat = getCurrentPlayerFlat();
+  if (!flat) { toast('Aucun joueur chargé.', true); return; }
+  let blob, ext;
+  if (format === 'json') {
+    blob = new Blob([JSON.stringify(window.data.player_current, null, 2)], { type: 'application/json' });
+    ext = 'json';
+  } else {
+    const cols = ['category', 'stat', 'value', 'percentile', 'player_name', 'player_id', 'team', 'league'];
+    const csv = [cols.join(',')].concat(flat.map(r =>
+      cols.map(c => {
+        let v = r[c];
+        if (v === undefined || v === null) return '';
+        v = String(v);
+        if (/[",\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+        return v;
+      }).join(',')
+    )).join('\n');
+    blob = new Blob([csv], { type: 'text/csv' });
+    ext = 'csv';
+  }
+  const safeName = (window.data.player_current.meta.name || 'player').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fotmob_${safeName}.${ext}`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`Joueur exporté (${ext.toUpperCase()})`);
+}
+
+async function copyPlayerToClipboard() {
+  if (!window.data.player_current) { toast('Aucun joueur chargé.', true); return; }
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(window.data.player_current, null, 2));
+    toast('Joueur copié au presse-papier');
+  } catch (e) { toast('Erreur clipboard: ' + e.message, true); }
+}
+
+// Initial render
+renderTable();
+console.log('%cFootball Data Workbench prêt.', 'color:#4f8cff;font-weight:bold');
+console.log('Tape window.data après avoir chargé un dataset ou un joueur.');
+
+// =====================================================================
+// FBREF BOOKMARKLET — parsing + rendering
+// =====================================================================
+
+function parseFBrefJSON() {
+  const txt = document.getElementById('fbref-json-paste').value.trim();
+  if (!txt) { toast('Colle d\'abord le JSON FBref.', true); return; }
+  let json;
+  try { json = JSON.parse(txt); }
+  catch (e) { toast('JSON invalide: ' + e.message, true); return; }
+
+  if (json.source !== 'fbref') { toast('Ce JSON ne semble pas venir d\'un bookmarklet FBref.', true); return; }
+
+  const display = document.getElementById('fbref-display');
+
+  if (json.type === 'player') {
+    // Store in window.data
+    const key = 'fbref_player_' + Date.now();
+    window.data[key] = json;
+    toast('Joueur FBref chargé : ' + (json.playerName || '?'));
+    renderFBrefPlayer(json, display);
+  } else if (json.type === 'team') {
+    const key = 'fbref_team_' + Date.now();
+    window.data[key] = json;
+    toast('Équipe FBref chargée : ' + (json.teamName || '?') + ' — ' + json.tables.length + ' tables');
+    renderFBrefTeam(json, display);
+  } else {
+    toast('Type FBref inconnu: ' + json.type, true);
+  }
+  document.getElementById('fbref-json-paste').value = '';
+}
+
+function renderFBrefPlayer(json, display) {
+  const rows = json.data || [];
+  if (!rows.length) {
+    display.innerHTML = `<div class="help" style="border-left-color:var(--warning)"><strong>Aucune ligne trouvée.</strong> Le bookmarklet n'a pas détecté de table stats sur cette page.</div>`;
+    return;
+  }
+  const cols = Object.keys(rows[0]);
+  const numCols = cols.filter(c => rows.some(r => r[c] !== '' && !isNaN(parseFloat(r[c]))));
+
+  display.innerHTML = `
+    <div style="margin-bottom:12px;">
+      <strong style="font-size:15px;">${escapeHtml(json.playerName || 'Joueur FBref')}</strong>
+      <span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${escapeHtml(json.url || '')}</span>
+      <span class="badge fbref" style="margin-left:8px;">FBref</span>
+    </div>
+    <div class="table-wrap" style="max-height:400px;">
+      <table>
+        <thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r => '<tr>' + cols.map(c => {
+          const v = r[c] || '';
+          const isNum = v !== '' && !isNaN(parseFloat(v));
+          return `<td class="${isNum ? 'numeric' : ''}">${escapeHtml(v)}</td>`;
+        }).join('') + '</tr>').join('')}</tbody>
+      </table>
+    </div>
+    <div class="footer-bar" style="margin-top:8px;">
+      <div class="row-count">${rows.length} lignes · ${cols.length} colonnes</div>
+      <button class="ghost fbref" onclick="exportFBrefData()">Export CSV</button>
+    </div>
+  `;
+  window.data._fbref_last = json;
+}
+
+function renderFBrefTeam(json, display) {
+  const tables = json.tables || [];
+  let html = `
+    <div style="margin-bottom:12px;">
+      <strong style="font-size:15px;">${escapeHtml(json.teamName || 'Équipe FBref')}</strong>
+      <span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${escapeHtml(json.url || '')}</span>
+      <span class="badge fbref" style="margin-left:8px;">FBref</span>
+      <span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${tables.length} table(s)</span>
+    </div>
+  `;
+  for (const tbl of tables) {
+    const rows = tbl.data || [];
+    if (!rows.length) continue;
+    const cols = Object.keys(rows[0]);
+    html += `
+      <details style="margin-bottom:8px;">
+        <summary style="cursor:pointer;padding:8px;background:var(--surface-2);border-radius:4px;font-size:13px;">
+          Table: <code>${escapeHtml(tbl.tableid || '?')}</code> — ${rows.length} lignes
+        </summary>
+        <div class="table-wrap" style="max-height:300px;margin-top:4px;">
+          <table>
+            <thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(r => '<tr>' + cols.map(c => {
+              const v = r[c] || '';
+              const isNum = v !== '' && !isNaN(parseFloat(v));
+              return `<td class="${isNum ? 'numeric' : ''}">${escapeHtml(v)}</td>`;
+            }).join('') + '</tr>').join('')}</tbody>
+          </table>
+        </div>
+      </details>
+    `;
+  }
+  display.innerHTML = html;
+  window.data._fbref_last = json;
+}
+
+function exportFBrefData() {
+  const json = window.data._fbref_last;
+  if (!json) { toast('Aucune donnée FBref chargée.', true); return; }
+  const rows = json.data || (json.tables && json.tables[0] && json.tables[0].data) || [];
+  if (!rows.length) { toast('Pas de données à exporter.', true); return; }
+  const cols = Object.keys(rows[0]);
+  const csv = [cols.join(',')].concat(rows.map(r =>
+    cols.map(c => {
+      let v = r[c] || '';
+      if (/[",\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    }).join(',')
+  )).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `fbref_${(json.playerName || json.teamName || 'data').replace(/[^a-zA-Z0-9_-]/g,'_')}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Export FBref CSV');
+}
+
+// =====================================================================
+// PLAYER PROFILES — Static data (taille, poids, nationalité, pied fort)
+// Clé : player_name.toLowerCase().trim()
+// Sources : Transfermarkt CSV (height, foot, nationality) + FotMob (weight)
+// =====================================================================
+window._playerProfiles = {};  // { "erling haaland": { height_cm, weight_kg, nationality, foot } }
+
+function normalizeName(name) {
+  return String(name || '').toLowerCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip accents
+    .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getProfile(playerName) {
+  return window._playerProfiles[normalizeName(playerName)] || null;
+}
+
+function upsertProfile(playerName, data) {
+  const key = normalizeName(playerName);
+  if (!key) return;
+  if (!window._playerProfiles[key]) window._playerProfiles[key] = {};
+  Object.assign(window._playerProfiles[key], data);
+}
+
+// --- Conversions impériales → métriques ---
+function parseFotMobHeight(str) {
+  // "6' 2\"" → mètres
+  if (!str) return null;
+  const m = String(str).match(/(\d+)'\s*(\d+)/);
+  if (!m) return null;
+  return Math.round((parseInt(m[1]) * 12 + parseInt(m[2])) * 2.54) / 100;
+}
+
+function parseFotMobWeight(str) {
+  // "192 lbs" → kg
+  if (!str) return null;
+  const m = String(str).match(/(\d+(\.\d+)?)\s*lbs/i);
+  if (!m) return null;
+  return Math.round(parseFloat(m[1]) * 0.453592);
+}
+
+// --- Extraction depuis FotMob raw JSON (appelée après loadFotMob) ---
+function extractProfilesFromFotMob(rawJson) {
+  let count = 0;
+  if (!Array.isArray(rawJson)) return count;
+  for (const league of rawJson) {
+    for (const club of (league.clubs || [])) {
+      for (const p of (club.players || [])) {
+        if (!p.name) continue;
+        const data = {};
+        const h = parseFotMobHeight(p.height);
+        const w = parseFotMobWeight(p.weight);
+        if (h !== null) data.height_cm = h;
+        if (w !== null) data.weight_kg = w;
+        if (p.nationality) data.nationality = p.nationality;
+        if (p.position) data.fotmob_position = p.position;
+        upsertProfile(p.name, data);
+        count++;
+      }
+    }
+  }
+  console.log(`[Profiles] FotMob → ${count} joueurs enrichis (height, weight, nationality)`);
+  return count;
+}
+
+// --- Loader Transfermarkt CSV.gz (foot + height + nationality en bulk) ---
+async function loadTransfermarkt() {
+  const url = 'https://riquescruz.github.io/football-data-workbench/players.csv.gz';
+  setStatus('tm', 'Téléchargement players.csv.gz…', 'loading');
+  setProgress('tm', 10);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setProgress('tm', 30);
+
+    // Décompression gzip côté browser via DecompressionStream
+    setStatus('tm', 'Décompression gzip…', 'loading');
+    const ds = new DecompressionStream('gzip');
+    const decompressed = res.body.pipeThrough(ds);
+    const reader = decompressed.getReader();
+    const chunks = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    setProgress('tm', 70);
+
+    const text = new TextDecoder().decode(
+      chunks.reduce((acc, chunk) => {
+        const merged = new Uint8Array(acc.length + chunk.length);
+        merged.set(acc); merged.set(chunk, acc.length);
+        return merged;
+      }, new Uint8Array(0))
+    );
+    setStatus('tm', 'Parsing CSV…', 'loading');
+    setProgress('tm', 85);
+
+    const rows = parseCSV(text);
+    setProgress('tm', 95);
+
+    let count = 0;
+    for (const r of rows) {
+      const name = r.name || r.last_name || '';
+      if (!name) continue;
+      const data = {};
+      if (r.height_in_cm && r.height_in_cm !== '') data.height_cm = parseFloat(r.height_in_cm) / 100;
+      if (r.foot && r.foot !== '') data.foot = r.foot;
+      if (r.country_of_citizenship && r.country_of_citizenship !== '') data.nationality = r.country_of_citizenship;
+      upsertProfile(name, data);
+      count++;
+    }
+    setProgress('tm', 100);
+
+    const total = Object.keys(window._playerProfiles).length;
+    setStatus('tm', `✓ ${count.toLocaleString()} joueurs TM intégrés — ${total.toLocaleString()} profils au total dans le dico`, 'success');
+    setTimeout(() => setProgress('tm', null), 1000);
+  } catch(e) {
+    setStatus('tm', '✗ Erreur: ' + e.message, 'error');
+    setProgress('tm', null);
+    console.error(e);
+  }
+}
+
+function showProfileStats() {
+  const profiles = window._playerProfiles;
+  const total = Object.keys(profiles).length;
+  if (!total) { toast('Aucun profil chargé.', true); return; }
+  const withHeight = Object.values(profiles).filter(p => p.height_cm).length;
+  const withWeight = Object.values(profiles).filter(p => p.weight_kg).length;
+  const withFoot   = Object.values(profiles).filter(p => p.foot).length;
+  const withNat    = Object.values(profiles).filter(p => p.nationality).length;
+  toast(`Profils: ${total} | Taille: ${withHeight} | Poids: ${withWeight} | Pied: ${withFoot} | Nat: ${withNat}`);
+}
+
+// =====================================================================
+// POSITIONS DICTIONARY — built from Understat historical CSV (season 2024)
+// key: player_name.toLowerCase().trim() → position string
+// =====================================================================
+window._positionDict = {};  // populated by buildPositionDict()
+
+function buildPositionDict(rows) {
+  // Keep only season 2024 rows; if absent keep all (graceful fallback)
+  const season2024 = rows.filter(r => String(r.season || r.year || '') === '2024');
+  const source = season2024.length > 0 ? season2024 : rows;
+
+  const dict = {};
+  for (const r of source) {
+    const name = String(r.player_name || r.player || '').toLowerCase().trim();
+    const pos  = String(r.position || '').trim();
+    if (name && pos) dict[name] = pos;
+  }
+  window._positionDict = dict;
+  console.log(`[Positions] Dico construit — ${Object.keys(dict).length} joueurs depuis saison 2024 (ou fallback total).`);
+}
+
+function lookupPosition(playerName, livePosValue) {
+  // Priority: Live field if non-empty, then historical dict, then ''
+  if (livePosValue && livePosValue.trim()) return livePosValue.trim();
+  const key = String(playerName).toLowerCase().trim();
+  return window._positionDict[key] || '';
+}
+
+// =====================================================================
+// UNDERSTAT LIVE — Bookmarklet paste parser
+// =====================================================================
+
+// Understat league name → moteur de reco slug mapping
+const UNDERSTAT_LEAGUE_MAP = {
+  'epl':        'EPL',
+  'la_liga':    'La liga',
+  'serie_a':    'Serie A',
+  'bundesliga': 'Bundesliga',
+  'ligue_1':    'Ligue 1',
+};
+
+// Chip IDs keyed by understat league slug
+const LEAGUE_CHIP_IDS = {
+  'epl': 'chip-EPL',
+  'la_liga': 'chip-La_liga',
+  'serie_a': 'chip-Serie_A',
+  'bundesliga': 'chip-Bundesliga',
+  'ligue_1': 'chip-Ligue_1',
+};
+
+function setLiveStatus(msg, cls) {
+  const el = document.getElementById('status-understat-live');
+  el.className = 'status ' + (cls || '');
+  el.textContent = msg;
+}
+
+function updateLiveCountLabel() {
+  const ds = window.data['understat_live'];
+  if (!ds) { document.getElementById('live-count-label').textContent = ''; return; }
+  const n = ds.rows.length;
+  const leagues = [...new Set(ds.rows.map(r => r.league_name).filter(Boolean))];
+  document.getElementById('live-count-label').textContent =
+    `✓ ${n.toLocaleString()} joueurs · ${leagues.length}/5 ligues (${leagues.join(', ')})`;
+}
+
+function parseUnderstatLiveFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const leagueRaw = document.getElementById('live-league-select').value;
+  const season = document.getElementById('live-season-input').value || '2025';
+
+  setLiveStatus('Lecture du fichier…', 'loading');
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    let players;
+    try {
+      players = JSON.parse(e.target.result);
+    } catch(err) {
+      setLiveStatus('JSON invalide : ' + err.message, 'error');
+      return;
+    }
+
+    if (!Array.isArray(players)) {
+      setLiveStatus('Format inattendu — le fichier doit être un tableau JSON.', 'error');
+      return;
+    }
+
+    const leagueName = UNDERSTAT_LEAGUE_MAP[leagueRaw] || leagueRaw;
+
+    // Normalise format export Understat → format interne Workbench
+    // Export natif: {number, player, team, apps, min, goals, a, xG, xA, xG90, xA90}
+    // Format interne: player_name, team_title, assists, + colonnes manquantes à 0
+    const rows = players.map(p => ({
+      player_name: p.player      || p.player_name || '',
+      team_title:  p.team        || p.team_title  || '',
+      position:    lookupPosition(p.player || p.player_name || '', p.position || ''),
+      league_name: leagueName,
+      season:      season,
+      games:       parseFloat(p.apps)    || 0,
+      time:        parseFloat(p.min)     || 0,
+      goals:       parseFloat(p.goals)   || 0,
+      xG:          parseFloat(p.xG)      || 0,
+      npxG:        parseFloat(p.npxG)    || parseFloat(p.xG) || 0, // fallback xG si npxG absent
+      assists:     parseFloat(p.a)       || parseFloat(p.assists) || 0,
+      xA:          parseFloat(p.xA)      || 0,
+      shots:       parseFloat(p.shots)   || 0,
+      key_passes:  parseFloat(p.key_passes) || 0,
+      xGChain:     parseFloat(p.xGChain) || 0,
+      xGBuildup:   parseFloat(p.xGBuildup) || 0,
+      yellow_cards:parseFloat(p.yellow_cards) || 0,
+      red_cards:   parseFloat(p.red_cards)    || 0,
+    }));
+
+    // Merge dans le dataset live (overwrite cette ligue)
+    if (!window.data['understat_live']) {
+      window.data['understat_live'] = { source: 'Understat Live', rows: [], leagues: {}, loaded_at: new Date().toISOString() };
+    }
+    const ds = window.data['understat_live'];
+    ds.rows = ds.rows.filter(r => r.league_name !== leagueName);
+    ds.rows = ds.rows.concat(rows);
+    ds.leagues[leagueRaw] = { count: rows.length, file: file.name, loadedAt: new Date().toISOString() };
+    ds.loaded_at = new Date().toISOString();
+
+    // Update chip
+    const chipId = LEAGUE_CHIP_IDS[leagueRaw];
+    if (chipId) {
+      const chip = document.getElementById(chipId);
+      if (chip) {
+        chip.classList.remove('pending');
+        chip.classList.add('done');
+        const labels = { 'chip-EPL': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 EPL', 'chip-La_liga': '🇪🇸 La Liga', 'chip-Serie_A': '🇮🇹 Serie A', 'chip-Bundesliga': '🇩🇪 Bundesliga', 'chip-Ligue_1': '🇫🇷 Ligue 1' };
+        chip.textContent = (labels[chipId] || chipId) + ` ✓ ${rows.length}`;
+      }
+    }
+
+    // Avance auto vers la prochaine ligue dans le select
+    const leagueSlugs = ['epl','la_liga','serie_a','bundesliga','ligue_1'];
+    const currentIdx = leagueSlugs.indexOf(leagueRaw);
+    if (currentIdx >= 0 && currentIdx < leagueSlugs.length - 1) {
+      document.getElementById('live-league-select').value = leagueSlugs[currentIdx + 1];
+    }
+
+    // Reset file input pour permettre de recharger le même fichier
+    input.value = '';
+
+    addDatasetToSelector('understat_live', `Understat Live — ${ds.rows.length} joueurs (${Object.keys(ds.leagues).length} ligues)`);
+    updateLiveCountLabel();
+    setLiveStatus(`✓ ${leagueName} ${season} — ${rows.length} joueurs intégrés. Total : ${ds.rows.length} joueurs sur ${Object.keys(ds.leagues).length} ligue(s).`, 'success');
+    populateRecTeams();
+  };
+
+  reader.onerror = function() { setLiveStatus('Erreur lecture fichier.', 'error'); };
+  reader.readAsText(file);
+}
+
+function resetUnderstatLive() {
+  if (!confirm('Réinitialiser toutes les données Understat Live ?')) return;
+  delete window.data['understat_live'];
+  // Reset chips
+  for (const [slug, chipId] of Object.entries(LEAGUE_CHIP_IDS)) {
+    const chip = document.getElementById(chipId);
+    if (chip) {
+      chip.classList.remove('done');
+      chip.classList.add('pending');
+      const labels = { 'chip-EPL': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 EPL', 'chip-La_liga': '🇪🇸 La Liga', 'chip-Serie_A': '🇮🇹 Serie A', 'chip-Bundesliga': '🇩🇪 Bundesliga', 'chip-Ligue_1': '🇫🇷 Ligue 1' };
+      chip.textContent = labels[chipId] || chipId;
+    }
+  }
+  updateLiveCountLabel();
+  setLiveStatus('Données live réinitialisées.', '');
+  // Re-populate recommender from CSV if available
+  populateRecTeams();
+}
+
+// =====================================================================
+// RECOMMENDER ENGINE — Understat-based
+// =====================================================================
+
+const REC_FEATURES = ['goals','xG','npxG','assists','xA','shots','key_passes'];
+const REC_FEATURE_LABELS = {
+  goals: 'Buts', xG: 'xG', npxG: 'npxG', assists: 'Passes D.', xA: 'xA',
+  shots: 'Tirs', key_passes: 'Passes clés'
+};
+
+// Populate team dropdown when Understat data is loaded (live preferred over CSV)
+function normalizeTeam(raw) {
+  // Understat concatène les équipes sur les transferts mid-season ("Angers,Marseille")
+  // On garde uniquement la dernière (= équipe de fin de saison)
+  if (!raw) return '';
+  const parts = String(raw).split(',');
+  return parts[parts.length - 1].trim();
+}
+
+function populateRecTeams() {
+  const ds = window.data['understat_live'] || window.data['understat_current'];
+  if (!ds) return;
+  const teams = new Set(ds.rows.map(r => normalizeTeam(r.team_title || r.team)).filter(Boolean));
+  const sel = document.getElementById('rec-team');
+  const current = sel.value;
+  const sourceBadge = window.data['understat_live'] ? ' ⚡ live' : '';
+  sel.innerHTML = '<option value="">— choisir une équipe' + sourceBadge + ' —</option>' +
+    [...teams].sort().map(t => `<option value="${escapeHtml(t)}" ${t===current?'selected':''}>${escapeHtml(t)}</option>`).join('');
+}
+
+// Monkey-patch: after loadUnderstat, try to populate teams
+const _origAddDataset = addDatasetToSelector;
+window.addDatasetToSelector = function(id, label) {
+  _origAddDataset(id, label);
+  if (id === 'understat_current' || id === 'understat_live') populateRecTeams();
+};
+
+function cosineSim(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  if (!na || !nb) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+function setRecStatus(msg, cls) {
+  const el = document.getElementById('rec-status');
+  el.style.display = 'block';
+  el.className = 'status ' + (cls || '');
+  el.textContent = msg;
+}
+
+function runRecommender() {
+  // Prefer live data over stale CSV repo
+  const ds = window.data['understat_live'] || window.data['understat_current'];
+  if (!ds) { setRecStatus('⚠ Charge d\'abord les données Understat — utilise ⚡ Understat Live (recommandé) ou le bouton "Charger saison 2025/26".', 'error'); return; }
+  const dataSource = window.data['understat_live'] ? '⚡ Live' : '⚠ CSV GitHub (peut être en retard)';
+
+  const teamName = document.getElementById('rec-team').value;
+  if (!teamName) { setRecStatus('⚠ Sélectionne une équipe cible.', 'error'); return; }
+
+  const posFilter = document.getElementById('rec-position').value;
+  const minMin = parseFloat(document.getElementById('rec-min-min').value) || 0;
+  const topN = parseInt(document.getElementById('rec-top-n').value) || 10;
+
+  // Collect selected leagues
+  const leagueSlugs = ['La liga','EPL','Serie A','Bundesliga','Ligue 1'];
+  const leagueCheckboxIds = {
+    'La liga': 'rec-lig-La-liga',
+    'EPL': 'rec-lig-EPL',
+    'Serie A': 'rec-lig-Serie-A',
+    'Bundesliga': 'rec-lig-Bundesliga',
+    'Ligue 1': 'rec-lig-Ligue-1',
+  };
+  const activeLigues = leagueSlugs.filter(l => {
+    const cb = document.getElementById(leagueCheckboxIds[l]);
+    return cb && cb.checked;
+  });
+  if (!activeLigues.length) { setRecStatus('⚠ Sélectionne au moins une ligue.', 'error'); return; }
+
+  setRecStatus('Calcul en cours…', 'loading');
+
+  // Slight delay to let UI update
+  setTimeout(() => {
+    try {
+      _runRecommender(ds.rows, teamName, posFilter, minMin, topN, activeLigues, dataSource);
+    } catch(e) {
+      setRecStatus('Erreur: ' + e.message, 'error');
+      console.error(e);
+    }
+  }, 30);
+}
+
+function getFloat(r, key) {
+  const v = r[key];
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  return 0;
+}
+
+function _runRecommender(allRows, teamName, posFilter, minMin, topN, activeLigues, dataSource) {
+  // ---- Step 1: filter to current season, min minutes ----
+  const rows = allRows.filter(r => {
+    const min = getFloat(r, 'time');
+    if (min < minMin) return false;
+    const league = r.league_name || r.league || '';
+    if (!activeLigues.some(l => String(league).toLowerCase().includes(l.toLowerCase()) || String(league) === l)) return false;
+    return true;
+  });
+
+  if (!rows.length) {
+    setRecStatus('Aucune ligne après filtres. Vérifie que la saison courante est chargée et les filtres ligue/minutes.', 'error');
+    return;
+  }
+
+  // ---- Step 2: compute per90 for each feature ----
+  const rowsP90 = rows.map(r => {
+    const min = Math.max(getFloat(r, 'time'), 1);
+    const p90 = {};
+    for (const f of REC_FEATURES) p90[f] = getFloat(r, f) / min * 90;
+    return { ...r, _p90: p90 };
+  });
+
+  // ---- Step 3: percentile normalization by position group ----
+  // Position groups: F, M, D, GK (or use raw position field)
+  function posGroup(pos) {
+    if (!pos) return 'M';
+    const p = String(pos).toUpperCase();
+    if (p.includes('GK') || p.includes('G')) return 'GK';
+    if (p.includes('F') || p.includes('ST') || p.includes('WF')) return 'F';
+    if (p.includes('D') || p.includes('CB') || p.includes('LB') || p.includes('RB')) return 'D';
+    return 'M';
+  }
+
+  // Build per-position feature arrays for percentile calc
+  const byPos = {};
+  for (const r of rowsP90) {
+    const pg = posGroup(r.position);
+    if (!byPos[pg]) byPos[pg] = [];
+    byPos[pg].push(r);
+  }
+
+  function percentileRank(arr, val) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const idx = sorted.filter(v => v <= val).length;
+    return idx / sorted.length;
+  }
+
+  // Compute percentile vectors for all rows
+  const featureArrs = {};
+  for (const [pg, pgRows] of Object.entries(byPos)) {
+    featureArrs[pg] = {};
+    for (const f of REC_FEATURES) {
+      featureArrs[pg][f] = pgRows.map(r => r._p90[f]);
+    }
+  }
+
+  const rowsNorm = rowsP90.map(r => {
+    const pg = posGroup(r.position);
+    const arr = featureArrs[pg] || featureArrs['M'];
+    const vec = REC_FEATURES.map(f => {
+      const vals = arr[f] || [0];
+      return percentileRank(vals, r._p90[f]);
+    });
+    return { ...r, _vec: vec, _pg: pg };
+  });
+
+  // ---- Step 4: build team profile ----
+  // Use players of the target team, filtered by position if specified
+  let teamRows = rowsNorm.filter(r => {
+    const t = normalizeTeam(r.team_title || r.team || '');
+    return t.toLowerCase() === teamName.toLowerCase();
+  });
+
+  if (posFilter) teamRows = teamRows.filter(r => r._pg === posFilter || posGroup(r.position) === posFilter);
+
+  if (!teamRows.length) {
+    // Try partial match
+    teamRows = rowsNorm.filter(r => {
+      const t = normalizeTeam(r.team_title || r.team || '').toLowerCase();
+      return t.includes(teamName.toLowerCase());
+    });
+    if (posFilter) teamRows = teamRows.filter(r => r._pg === posFilter || posGroup(r.position) === posFilter);
+  }
+
+  // Team profile = mean vector of team's players in the filtered position
+  let teamProfile;
+  if (teamRows.length) {
+    teamProfile = REC_FEATURES.map((_, fi) => {
+      const vals = teamRows.map(r => r._vec[fi]).filter(v => !isNaN(v));
+      return vals.length ? vals.reduce((s,v) => s+v, 0) / vals.length : 0.5;
+    });
+  } else {
+    // No team data: use average profile (all 0.5)
+    teamProfile = REC_FEATURES.map(() => 0.5);
+  }
+
+  // "Gap profile": invert team strength → target the weaknesses
+  // We search for players who fill the gaps (low percentile areas)
+  const gapProfile = teamProfile.map(v => 1 - v);
+
+  // ---- Step 5: candidate pool ----
+  // Exclude players already in the team; apply position filter
+  let candidates = rowsNorm.filter(r => {
+    const t = normalizeTeam(r.team_title || r.team || '').toLowerCase();
+    if (t === teamName.toLowerCase()) return false;
+    if (t.includes(teamName.toLowerCase())) return false;
+    if (posFilter && r._pg !== posFilter) return false;
+    return true;
+  });
+
+  // ---- Step 6: compute similarity score ----
+  // Score = cosine similarity between player vector and gap profile
+  // This rewards players who are strong where team is weak
+  const scored = candidates.map(r => {
+    const sim = cosineSim(r._vec, gapProfile);
+    return { ...r, _sim: sim };
+  });
+
+  scored.sort((a, b) => b._sim - a._sim);
+  const top = scored.slice(0, topN);
+
+  // ---- Render ----
+  renderTeamProfile(teamName, teamProfile, teamRows, gapProfile);
+  renderRecResults(top, teamName, posFilter);
+  setRecStatus(`✓ Analyse terminée [${dataSource || 'CSV'}] · ${candidates.length} candidats évalués · ${teamRows.length} joueurs équipe trouvés`, 'success');
+}
+
+function renderTeamProfile(teamName, profileVec, teamRows, gapVec) {
+  const el = document.getElementById('rec-team-profile');
+  const bars = REC_FEATURES.map((f, i) => {
+    const pct = profileVec[i];
+    const gap = gapVec[i];
+    const gapCls = gap > 0.6 ? 'high' : gap > 0.4 ? 'med' : 'low';
+    const gapLabel = gap > 0.6 ? 'lacune' : gap > 0.4 ? 'moyen' : 'fort';
+    return `
+      <div class="rec-bar-row">
+        <span class="rb-label">${REC_FEATURE_LABELS[f]}</span>
+        <div class="rb-track"><div class="rb-fill" style="width:${(pct*100).toFixed(1)}%"></div></div>
+        <span class="rb-val">${(pct*100).toFixed(0)}e</span>
+        <span class="gap-badge ${gapCls}">${gapLabel}</span>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="team-profile-card">
+      <h4>Profil moyen <strong>${escapeHtml(teamName)}</strong> (poste filtré) — ${teamRows.length} joueur(s) dans le dataset</h4>
+      <div class="team-profile-bars">${bars}</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Valeurs en percentile (0–100). "Lacune" = zones où le moteur cherche des renforts.</div>
+    </div>`;
+}
+
+function renderRecResults(top, teamName, posFilter) {
+  const el = document.getElementById('rec-results');
+  if (!top.length) {
+    el.innerHTML = `<div class="help" style="border-left-color:var(--warning)"><strong>Aucun résultat.</strong> Essaie d'abaisser le minimum de minutes ou d'élargir les ligues.</div>`;
+    return;
+  }
+  const rankIcon = i => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+  const cards = top.map((r, i) => {
+    const name = r.player_name || r.name || '?';
+    const team = normalizeTeam(r.team_title || r.team || '?');
+    const pos = r.position || r._pg || '?';
+    const league = r.league_name || r.league || '';
+    const sim = (r._sim * 100).toFixed(1);
+    const bars = REC_FEATURES.map((f, fi) => {
+      const pct = (r._vec[fi] * 100).toFixed(0);
+      return `
+        <div class="rec-bar-row">
+          <span class="rb-label">${REC_FEATURE_LABELS[f]}</span>
+          <div class="rb-track"><div class="rb-fill" style="width:${pct}%;opacity:0.8"></div></div>
+          <span class="rb-val">${pct}e</span>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="rec-card">
+        <div class="rec-rank ${rankIcon(i)}">#${i+1}</div>
+        <div>
+          <div class="rec-name">${escapeHtml(name)}</div>
+          <div class="rec-meta">${escapeHtml(team)} · ${escapeHtml(league)} · ${escapeHtml(pos)}</div>
+          <div class="rec-bars">${bars}</div>
+        </div>
+        <div class="rec-score">
+          <div class="score-val">${sim}</div>
+          <div class="score-label">score</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <h3 style="margin:0 0 12px 0;font-size:14px;">Top ${top.length} recommandations pour <strong>${escapeHtml(teamName)}</strong>${posFilter ? ' · ' + posFilter : ''}</h3>
+    ${cards}
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Score = similarité cosinus entre le vecteur percentile du joueur et le profil de lacune de l'équipe.</div>
+  `;
+}
+</script>
+</body>
+</html>
