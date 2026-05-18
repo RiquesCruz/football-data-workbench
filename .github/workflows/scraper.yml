@@ -1,0 +1,58 @@
+name: FBref Weekly Scraper
+
+on:
+  schedule:
+    # Chaque lundi à 06:00 UTC (après les matchs du week-end européen)
+    - cron: "0 6 * * 1"
+  workflow_dispatch:  # Déclenchement manuel possible depuis GitHub UI
+
+permissions:
+  contents: write  # Nécessaire pour pusher le CSV
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # 20 requêtes × 3s + marge = ~5min réel, 30min safeguard
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests pandas beautifulsoup4 lxml cloudscraper
+
+      - name: Run scraper
+        run: |
+          python fbref_scraper.py \
+            --output fbref_def_features.csv \
+            --delay 3.5
+        # 3.5s au lieu de 3s : légèrement plus conservateur sur les runners GitHub
+        # (IPs partagées → FBref peut être plus sensible)
+
+      - name: Verify output
+        run: |
+          if [ ! -f fbref_def_features.csv ]; then
+            echo "❌ CSV non généré — scraping échoué"
+            exit 1
+          fi
+          LINES=$(wc -l < fbref_def_features.csv)
+          echo "✓ CSV généré : $LINES lignes"
+          if [ "$LINES" -lt 100 ]; then
+            echo "⚠️  Moins de 100 lignes — vérifier les logs"
+            exit 1
+          fi
+
+      - name: Commit & push CSV
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add fbref_def_features.csv
+          # Ne commit que si le fichier a changé
+          git diff --staged --quiet || git commit -m "chore: update fbref_def_features.csv [$(date +'%Y-%m-%d')]"
+          git push
